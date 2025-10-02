@@ -1,0 +1,191 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(154, 50, 50);
+        }
+
+        .stylized-button {
+            color: white;
+            padding: 3px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .stylized-button:hover {
+            transform: scale(1.05);
+        }
+        .stylized-button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not produce the expected output. Please swipe or regenerate. If this is the first message, you should ignore this.
+        </div>
+        <button class="stylized-button" id="ignore_btn">Ignore</button>
+    </div>
+    <div id="main_cont"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            //init error stuff
+            const main_cont = document.getElementById("main_cont")
+            const error = document.getElementById("error")
+            const error_msg = document.getElementById("error_msg")
+            const errorIgnoreBtn = document.getElementById("ignore_btn")
+            errorIgnoreBtn.addEventListener("click", function () {
+                main_cont.style.display = "flex"
+                error.style.display = "none"
+            })
+
+
+            //load input
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
+            let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+            const regexInput = /(?<=<rating>\s*)(yes|no)(?=\s*<\/rating>)/i
+            let rating = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+
+
+            //load chatdata
+            let totalRating
+            let gameOver
+            let chatData = `{{getvar::chatData}}`
+            if (chatData == "") {
+                triggerSlash(`/setvar key=chatData {}`)
+                rating = ""
+                gameOver = false
+                userMesEdited = false
+            }
+            else {
+                chatData = JSON.parse(getVariables()["chatData"])
+                totalRating = chatData["totalRating"]
+                gameOver = chatData["gameOver"]
+                userMesEdited = false
+            }
+
+
+            function saveData() {
+                chatData = {
+                    "totalRating": totalRating,
+                    "rating": rating,
+                    "gameOver": gameOver,
+                    "userMesEdited": userMesEdited
+                }
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+
+
+            //intro handler
+            if(newGenSwipes["message_id"] === 0) {
+                error.style.display = "none"
+                if(newGenSwipes["swipe_id"] === 0) {
+                    totalRating = 3
+                }
+                else {
+                    totalRating = 8
+                }
+            }
+
+
+            //verifiers
+            if (gameOver) {
+                if(main_cont.parentNode != null) {
+                    main_cont.parentNode.removeChild(main_cont)
+                }
+                saveData()
+                return
+            }
+            if(newGenSwipes["message_id"] !== 0 && (input == "" || rating == "")) {
+                main_cont.style.display = "none"
+                error.style.display = "flex"
+                saveData()
+                return
+            }
+
+
+            let toJB = ""
+            //main script func here
+            if(totalRating === 11 || gameOver) {
+                toJB += "{{user}} is now a big independent cat. And good timing, the scientists have finally finished their research on you. You are now allowed to leave the facility. As a cat, you're not sad, but relieved and glad that you can leave him alone. Keep this a secret from {{user}}. You don't need to say goodbye."
+                gameOver = true
+            }
+            else if(totalRating <= 0) {
+                toJB += "{{user}}'s immaturity is far too much. What an annoying brat! He might need some spanking if he keeps this up."
+            }
+            else if(totalRating <= 2) {
+                toJB += "{{user}} is such an adorable little kitten. Give him all the attention he needs. Pamper him a lot."
+            }
+            else if(totalRating <= 4) {
+                toJB += "Hmm... guess you were just seeing things. {{user}} is still a kitten who needs you by his side."
+            }
+            else if(totalRating <= 6) {
+                toJB += "It's a beautiful day to relax. {{user}} is so precious and steadily growing."
+            }
+            else if(totalRating <= 8) {
+                toJB += "Hmm... it seems that {{user}} is turning into a big, precious kitten. Your instincts tell you to keep your distance from now on, to encourage his independence."
+            }
+            else if(totalRating <= 10) {
+                toJB += "{{user}} is now a big, independent cat. You are proud of him. Your farewell is near. As a cat, you're not sad, but relieved and glad that you can leave him alone."
+            }
+
+            
+            updateJB()
+            saveData()
+
+
+            function updateJB() {
+                triggerSlash(`/setvar key=jbout ${toJB}`)
+                toJB = ""
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

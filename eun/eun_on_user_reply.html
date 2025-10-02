@@ -1,0 +1,131 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main_cont"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const main_cont = document.getElementById("main_cont")
+
+
+            //load chatdata
+            let chatData = JSON.parse(getVariables()["chatData"])
+            let toCut = chatData["toCut"]
+            let removeCount = chatData["removeCount"]
+            let toReplace = chatData["toReplace"]
+            let userMesEdited = chatData["userMesEdited"]
+            let swiped = false
+
+
+            //edit handler - user side
+            if(userMesEdited) {
+                main_cont.parentNode.removeChild(main_cont)
+                saveData()
+                return
+            }
+            userMesEdited = true
+
+
+            toCut = true
+            removeCount = 3
+            toReplace.push(genCorruptFragment())
+            toReplace.push(genCorruptFragment())
+            toReplace.push(genCorruptFragment())
+            toReplace.push(genCorruptFragment())
+            toReplace.push(genCorruptFragment())
+            toReplace.push(genCorruptFragment())
+
+
+            saveData()
+
+
+            function genCorruptFragment() {
+                const c = ["b","c","d","f","g","h","j","k","l","m","n","p","q","r","s","t","v","w","x","z"]
+                const v = ["a", "e", "i", "o", "u", "y"]
+                const patterns = ["cv", "cc", "vc", "vv"]
+                let output = ""
+                while(output === "" || containsString(toReplace, output)) {
+                    output = ""
+                    let len = [1,2,2,2]
+                    let pattern = patterns[Math.floor(Math.random() * patterns.length)]
+                    len = len[Math.floor(Math.random() * len.length)]
+                    if(len === 2) {
+                        switch(pattern) {
+                            case "cv":
+                                output += c[Math.floor(Math.random() * c.length)]
+                                output += v[Math.floor(Math.random() * v.length)]
+                            break
+                            case "cc":
+                                output += c[Math.floor(Math.random() * c.length)]
+                                output += c[Math.floor(Math.random() * c.length)]
+                            break
+                            case "vc":
+                                output += v[Math.floor(Math.random() * v.length)]
+                                output += c[Math.floor(Math.random() * c.length)]
+                            break
+                            case "vv":
+                                output += v[Math.floor(Math.random() * v.length)]
+                                output += v[Math.floor(Math.random() * v.length)]
+                            break
+                            default: console.error("Error on gen corrupt fragment.")
+                        }
+                    }
+                    else {
+                        let cv = [c,v]
+                        cv = cv[Math.floor(Math.random() * cv.length)]
+                        output = cv[Math.floor(Math.random() * cv.length)]
+                    }
+                }
+
+                return output
+            }
+
+
+            function containsString(array, str) { //case insensitive
+                return array.some(item => item.toLowerCase() === str.toLowerCase());
+            }
+
+
+            function saveData() {
+                chatData["toCut"] = toCut
+                chatData["removeCount"] = removeCount
+                chatData["toReplace"] = toReplace
+                chatData["userMesEdited"] = userMesEdited
+                chatData["swiped"] = swiped
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

@@ -1,0 +1,589 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            background-color: #365066;
+            margin: 0 auto;
+            width: 500px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 20px;
+            border-radius: 7px;
+            padding: 10px;
+            background: linear-gradient(180deg, #6b61d8, #7379b6, #6954bb);
+            color: white;
+        }
+
+        div {
+            min-height: 20px;
+            /*border: 1px solid black;*/
+        }
+
+        #lifelines {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 10px;
+        }
+
+        #question {
+            padding: 10px;
+            text-align: center;
+        }
+
+        #choices {
+            display: grid;
+            grid-template-columns: auto auto;
+            justify-content: space-around;
+            padding: 10px;
+            gap: 3px;
+        }
+
+        #output {
+            padding: 10px;
+            text-align: center;
+        }
+
+        .border_blue {
+            border: 1px solid #0ED9E8;
+        }
+
+        .choice_btn {
+            width: 200px;
+            border: 0px;
+            font-size: 0.7em;
+        }
+
+        .choice_btn:hover,
+        .oval:hover {
+            color: black;
+            background-color: #C9B159;
+        }
+
+        #price {
+            padding: 10px;
+            width: 60%;
+        }
+
+        .hex {
+            height: 30px;
+            aspect-ratio: 1/cos(30deg);
+            clip-path: polygon(50% -50%, 100% 50%, 50% 150%, 0 50%);
+            background: #2E3099;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            transition: background-color 0.3s ease;
+        }
+
+        .oval {
+            height: 50px;
+            width: 100px;
+            background-color: #2E3099;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            transition: background-color 0.3s ease;
+        }
+
+        .gold_font {
+            color: #E0B628;
+        }
+
+        #audience_percent_answers {
+            padding: 10px;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+            margin: 0;
+        }
+
+        .bar {
+            width: 50px;
+            margin: 0 10px;
+            background-color: #3498db;
+            text-align: center;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+        }
+
+        .bar-label {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(255, 156, 156);
+        }
+
+        .fa-xmark {
+            position: absolute;
+            color: red;
+            font-size: 3em;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not generate the expected output. Please swipe/regenerate.
+        </div>
+        <button id="ignore_btn">Ignore</button>
+    </div>
+
+    <div id="main_cont">
+        <div class="border_blue" id="lifelines">
+            <div class="lifeline_btn oval" id="fiftyfifty">50:50<i class="fa-solid fa-xmark"></i></div>
+            <div class="lifeline_btn oval" id="phonefriend"><i class="fa-solid fa-phone-volume"></i><i
+                    class="fa-solid fa-xmark"></i></div>
+            <div class="lifeline_btn oval" id="askaudience"><i class="fa-solid fa-people-group"></i><i
+                    class="fa-solid fa-xmark"></i></div>
+        </div>
+
+        <div class="hex gold_font" id="price">
+        </div>
+
+        <div class="border_blue" id="question">
+        </div>
+
+        <div class="border_blue" id="choices">
+            <div class="choice_btn hex" id="choice_a"><span style="margin-right: 5px;" class="gold_font">A:</span>
+            </div>
+            <div class="choice_btn hex" id="choice_b"><span style="margin-right: 5px;" class="gold_font">B:</span>
+            </div>
+            <div class="choice_btn hex" id="choice_c"><span style="margin-right: 5px;" class="gold_font">C:</span>
+            </div>
+            <div class="choice_btn hex" id="choice_d"><span style="margin-right: 5px;" class="gold_font">D:</span>
+            </div>
+        </div>
+
+        <div class="border_blue" id="audience_percent_answers">
+        </div>
+
+        <div class="border_blue" id="output">
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            //error func
+            const main_cont = document.getElementById("main_cont")
+            const error = document.getElementById("error")
+            const error_msg = document.getElementById("error_msg")
+            const errorIgnoreBtn = document.getElementById("ignore_btn")
+            errorIgnoreBtn.addEventListener("click", function () {
+                main_cont.style.display = "flex"
+                error.style.display = "none"
+            })
+
+
+            //load/init data
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+            const regexInput = /<question>[\S\s]+?<\/question>/i
+            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+
+
+            let chatData = `{{getvar::chatData}}`
+            let gameOver
+            let winnings
+            let currQuestion
+            let unclickables = []
+            let cooldown
+            let phoneCooldown
+            let inPhone
+            let savedBeforePhone
+            let questionExpected
+            let toJB
+            let userMesEdited
+            if (chatData == "") {
+                triggerSlash(`/setvar key=chatData {}`)
+                gameOver = false
+                winnings = 0
+                currQuestion = 0
+                unclickables = []
+                cooldown = 0
+                phoneCooldown = 0
+                inPhone = false
+                savedBeforePhone = ""
+                questionExpected = false
+                toJB = ""
+                userMesEdited = false
+            }
+            else {
+                chatData = JSON.parse(getVariables()["chatData"])
+                gameOver = chatData["gameOver"]
+                winnings = chatData["winnings"]
+                currQuestion = chatData["currQuestion"]
+                unclickables = chatData["unclickables"]
+                cooldown = chatData["cooldown"]
+                phoneCooldown = chatData["phoneCooldown"]
+                inPhone = chatData["inPhone"]
+                savedBeforePhone = chatData["savedBeforePhone"]
+                questionExpected = chatData["questionExpected"]
+                toJB = chatData["toJB"]
+                userMesEdited = false
+            }
+
+
+            //save data
+            function saveData() {
+                chatData = {
+                    "gameOver": gameOver,
+                    "winnings": winnings,
+                    "currQuestion": currQuestion,
+                    "unclickables": unclickables,
+                    "cooldown": cooldown,
+                    "phoneCooldown": phoneCooldown,
+                    "inPhone": inPhone,
+                    "savedBeforePhone": savedBeforePhone,
+                    "questionExpected": questionExpected,
+                    "toJB": toJB,
+                    "userMesEdited": userMesEdited
+                }
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+
+
+            let unclickableChoices = []
+
+
+            if (gameOver) {
+                main_cont.parentNode.removeChild(main_cont)
+                saveData()
+                return
+            }
+            if (questionExpected && input == "" && inPhone === false) {
+                main_cont.style.display = "none"
+                error.style.display = "flex"
+                saveData()
+                return
+            }
+            if (inPhone) {
+                if(phoneCooldown <= 0) {
+                    inPhone = false
+                    triggerSlash(`/comment ${savedBeforePhone}`)
+                }
+                else {
+                    main_cont.style.display = "none"
+                    error.style.display = "none"
+                    saveData()
+                    return
+                }
+            }
+            if(newGenSwipes["message_id"] === 0 || questionExpected === false) {
+                main_cont.style.display = "none"
+                error.style.display = "none"
+            }
+
+
+            const outInfo = document.getElementById("output")
+            const lifelines = [...document.getElementsByClassName("lifeline_btn")]
+            const choices = [...document.getElementsByClassName("choice_btn")]
+            const priceLadder = [
+                "100",
+                "200",
+                "300",
+                "500",
+                "1,000",
+                "2,000",
+                "4,000",
+                "8,000",
+                "16,000",
+                "32,000",
+                "64,000",
+                "125,000",
+                "250,000",
+                "500,000",
+                "1,000,000"
+            ]
+            const regexQuestion = /(?<=Question:\s)[\s\S]+?\?(?=\sA\:)/i
+            const regexAnsA = /(?<=Question:[\s\S]+?\s*A:\s)[^\n]+?(?=\s*B\:[\S\s]+?Answers count\:)/i
+            const regexAnsB = /(?<=Question:[\s\S]+?\s*B:\s)[^\n]+?(?=\s*C\:[\S\s]+?Answers count\:)/i
+            const regexAnsC = /(?<=Question:[\s\S]+?\s*C:\s)[^\n]+?(?=\s*D\:[\S\s]+?Answers count\:)/i
+            const regexAnsD = /(?<=Question:[\s\S]+?\s*D:\s)[^\n]+?(?=\s*Correct answer\:)/i
+            const regexCorrectAns = /(?<=Question:[\s\S]+?\s*Correct answer:\s)[ABCD](?=\s*Answers count\:)/i
+            const regexAnsCountA = /(?<=Answers count:\s*A:\s)\d+?\s(?=B\:)/i
+            const regexAnsCountB = /(?<=Answers count:[\S\s]+?B:\s)\d+?\s(?=C\:)/i
+            const regexAnsCountC = /(?<=Answers count:[\S\s]+?C:\s)\d+?\s(?=D\:)/i
+            const regexAnsCountD = /(?<=Answers count:[\S\s]+?D:\s)\d+?(?=\s*\<\/question\>)/i
+            const questionElem = document.getElementById("question")
+            const priceElem = document.getElementById("price")
+
+            const question = regexQuestion.test(input) ? (input.match(regexQuestion))[0] : ""
+            const ansA = regexAnsA.test(input) ? (input.match(regexAnsA))[0] : ""
+            const ansB = regexAnsB.test(input) ? (input.match(regexAnsB))[0] : ""
+            const ansC = regexAnsC.test(input) ? (input.match(regexAnsC))[0] : ""
+            const ansD = regexAnsD.test(input) ? (input.match(regexAnsD))[0] : ""
+            const correctChoice = regexCorrectAns.test(input) ? (input.match(regexCorrectAns))[0] : ""
+            const ansACount = regexAnsCountA.test(input) ? (input.match(regexAnsCountA))[0] : ""
+            const ansBCount = regexAnsCountB.test(input) ? (input.match(regexAnsCountB))[0] : ""
+            const ansCCount = regexAnsCountC.test(input) ? (input.match(regexAnsCountC))[0] : ""
+            const ansDCount = regexAnsCountD.test(input) ? (input.match(regexAnsCountD))[0] : ""
+
+            const toVerify = [
+                question, ansA, ansB, ansC, ansD, correctChoice, ansACount, ansBCount, ansCCount, ansDCount
+            ]
+            toVerify.forEach(element => {
+                if (element == "" && questionExpected) {
+                    main_cont.style.display = "none"
+                    error.style.display = "flex"
+                    saveData()
+                    return
+                }
+            })
+
+
+            priceElem.innerText += `$${priceLadder[currQuestion - 1]}`
+            questionElem.innerText = question
+
+
+            lifelines.forEach(element => {
+                if (unclickables.includes(element.id)) {
+                    element.style.backgroundColor = "#757575"
+                    element.querySelector(".fa-xmark").style.display = "block"
+
+                    if (savedBeforePhone.length > 0) {
+                        switch (element.id) {
+                            case "fiftyfifty":
+                                executeFiftyFifty(["A", "B", "C", "D"])
+                                break;
+                            case "askaudience":
+                                document.getElementById("audience_percent_answers").style.display = "flex"
+                                break;
+                        }
+                    }
+                    return
+                }
+                element.addEventListener("click", async function () {
+                    if (unclickables.includes(element.id)) {
+                        return
+                    }
+                    unclickables.push(element.id)
+                    element.querySelector(".fa-xmark").style.display = "block"
+                    element.style.backgroundColor = "#757575"
+                    switch (element.id) {
+                        case "fiftyfifty":
+                            executeFiftyFifty(["A", "B", "C", "D"])
+                            toJB += `
+- {{user}} used the Fifty-Fifty lifeline.`
+                            break;
+                        case "phonefriend":
+                            inPhone = true
+                            phoneCooldown = 2
+                            savedBeforePhone = input
+                            main_cont.style.display = "none"
+                            toJB += `
+- {{user}} used the Phone a Friend lifeline.`
+                            triggerSlash(`/send [Now calling {{user}}'s beloved friend] | /trigger`)
+                            saveData()
+                            break;
+                        case "askaudience":
+                            document.getElementById("audience_percent_answers").style.display = "flex"
+                            toJB += `
+- {{user}} used the Ask the Audience lifeline.`
+                            break;
+                        default: console.error("Error on lifeline click.")
+                    }
+                })
+
+                element.addEventListener("mouseover", function () {
+                    if (unclickables.includes(element.id)) {
+                        element.style.backgroundColor = "#757575"
+                        return
+                    }
+                    switch (element.id) {
+                        case "fiftyfifty":
+                            outInfo.innerText = "Fifty-fifty: Remove two wrong answers from the choices."
+                            break;
+                        case "phonefriend":
+                            outInfo.innerText = "Phone a friend: Call a close friend to help you."
+                            break;
+                        case "askaudience":
+                            outInfo.innerText = "Ask the audience: Display a quick poll of the audience's answers."
+                            break;
+                        default: console.error("Error on lifeline hover.")
+                    }
+                })
+
+                element.addEventListener("mouseout", function () {
+                    outInfo.innerText = ""
+                })
+
+            });
+
+
+            choices.forEach(element => {
+                let selected
+                switch (element.id) {
+                    case "choice_a":
+                        element.innerHTML += ansA
+                        selected = "A"
+                        break;
+                    case "choice_b":
+                        element.innerHTML += ansB
+                        selected = "B"
+                        break;
+                    case "choice_c":
+                        element.innerHTML += ansC
+                        selected = "C"
+                        break;
+                    case "choice_d":
+                        element.innerHTML += ansD
+                        selected = "D"
+                        break;
+                    default: console.error("Error on choice init.")
+                }
+                if (unclickableChoices.includes(selected)) {
+                    element.innerHTML = `<span style="margin-right: 5px;" class="gold_font">${selected}:</span>`
+                    return
+                }
+                element.addEventListener("click", (event) => initChoiceButton(event, element))
+            })
+
+
+            async function initChoiceButton(e, elem) {
+                let isCorrect = false
+                let selected
+                switch (elem.id) {
+                    case "choice_a":
+                        selected = "A"
+                        break;
+                    case "choice_b":
+                        selected = "B"
+                        break;
+                    case "choice_c":
+                        selected = "C"
+                        break;
+                    case "choice_d":
+                        selected = "D"
+                        break;
+                    default: console.error("Error on choice click.")
+                }
+                if (unclickableChoices.includes(selected)) {
+                    elem.innerHTML = `<span style="margin-right: 5px;" class="gold_font">${selected}:</span>`
+                    return
+                }
+                isCorrect = selected === correctChoice
+                main_cont.parentNode.removeChild(main_cont)
+
+                if (isCorrect === false) {
+                    gameOver = true
+                    toJB += `
+- {{user}}'s selected answer is incorrect.`
+                }
+                else {
+                    toJB += `
+- {{user}}'s selected answer is correct.`
+                    if (currQuestion >= 15) {
+                        gameOver = true
+                    }
+                }
+
+                const a = "{{"
+                const b = "input"
+                const c = "}}"
+                triggerSlash(`/send ${a+b+c} |
+                /setinput {{noop}} |
+                /trigger`)
+
+                saveData()
+            }
+
+
+            //fiftyfifty func
+            function executeFiftyFifty(toRemove) {
+                let arr = [...toRemove]
+                arr = arr.filter(element => element !== correctChoice)
+                arr = shuffleArray(arr)
+                arr.pop()
+                arr.forEach(element => {
+                    const elem_id = `choice_${element.toLowerCase()}`
+                    const elem = document.getElementById(elem_id)
+                    elem.innerHTML = `<span style="margin-right: 5px;" class="gold_font">${element}:</span>`
+                    if (unclickableChoices.includes(element) === false) {
+                        unclickableChoices.push(element)
+                    }
+                });
+            }
+
+
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1)); // Random index
+                    [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+                }
+                return array;
+            }
+
+
+            //audience bargraph
+            const count = [ansACount, ansBCount, ansCCount, ansDCount]
+            const maxDataValue = Math.max(...count)
+            const barContainer = document.getElementById('audience_percent_answers')
+            count.forEach(value => {
+                const normalizedHeight = (value / maxDataValue) * 100
+                const bar = document.createElement('div')
+                bar.className = 'bar'
+                bar.style.height = normalizedHeight + 'px'
+                bar.innerHTML = `<div class="bar-label">${getBarLabel(count.indexOf(value))}</div>`
+                barContainer.appendChild(bar)
+            })
+
+
+            function getBarLabel(index) {
+                switch (index) {
+                    case 0: return "A"
+                    case 1: return "B"
+                    case 2: return "C"
+                    case 3: return "D"
+                    default: console.error("Error on getting bar label.")
+                }
+            }
+
+
+            saveData()
+        })
+    </script>
+</body>
+
+</html>
+```

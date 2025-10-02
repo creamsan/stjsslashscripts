@@ -1,0 +1,97 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(255, 156, 156);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main_cont">
+        <button>wag</button>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            //init html stuff
+            const main_cont = document.getElementById("main_cont")
+
+            let newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]["swipes"]
+            let input = newGenSwipes[newGenSwipes.length - 1]
+            const regexInput = /<result>[\S\s]+?<\/result>/i
+            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+
+
+            let chatData = JSON.parse(getVariables()["chatData"])
+            let toJB = chatData["toJB"]
+
+
+            await insertOrAssignVariables({jbout1: `from insertorassign: ${toJB}`});
+            await updateJB()
+            if(true) {
+                await insertOrAssignVariables({jbout3: `from if insertorassign: ${toJB}`});
+                await updateJB2()
+            }
+
+
+            async function updateJB() {
+                await insertOrAssignVariables({jbout2: `from func insertorassign: ${toJB}`});
+            }
+
+            async function updateJB2() {
+                await insertOrAssignVariables({jbout4: `from if func func insertorassign: ${toJB}`});
+            }
+
+
+            function saveData() {
+                chatData = {
+                    "toJB": toJB,
+                    "gameOver": gameOver
+                }
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

@@ -1,0 +1,93 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main_cont"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const main_cont = document.getElementById("main_cont")
+            let chatData = JSON.parse(getVariables()["chatData"])
+            let userMesEdited = chatData["userMesEdited"]
+
+
+            //edit handler - user side
+            if(userMesEdited) {
+                main_cont.parentNode.removeChild(main_cont)
+                saveData()
+                return
+            }
+            userMesEdited = true
+
+
+            let speedGain = Number.parseInt(chatData["speedGain"])
+            let origSpeed = chatData["origSpeed"] + speedGain
+            let playerSpeed = Math.max(30, chatData["playerSpeed"] + speedGain)
+            let origHealth = chatData["origHealth"]
+            let playerHealth = chatData["playerHealth"]
+            updateHealth(Number.parseInt(chatData["healthGain"]))
+            let playerEnergy = chatData["playerEnergy"]
+            updateEnergy(Number.parseInt(chatData["energyGain"]))
+            let playerStrength = chatData["playerStrength"] + Number.parseInt(chatData["strengthGain"])
+            playerStrength = Math.max(playerStrength, 0)
+
+
+            saveData()
+
+
+            function updateHealth (toAdd) {
+                playerHealth += toAdd
+                playerHealth = Math.max(playerHealth, 0)
+                playerHealth = Math.min(playerHealth, origHealth)
+            }
+
+
+            function updateEnergy (toAdd) {
+                playerEnergy += toAdd
+                playerEnergy = Math.max(playerEnergy, 0)
+            }
+
+
+            function saveData() {
+                chatData["origSpeed"] = origSpeed
+                chatData["playerSpeed"] = playerSpeed
+                chatData["playerHealth"] = playerHealth
+                chatData["playerEnergy"] = playerEnergy
+                chatData["playerStrength"] = playerStrength
+                chatData["userMesEdited"] = userMesEdited
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

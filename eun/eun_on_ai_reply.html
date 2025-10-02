@@ -1,0 +1,372 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            border-radius: 7px;
+            padding: 10px;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(255, 156, 156);
+        }
+
+        #unlocked {
+            background: url("https://rare-gallery.com/mocahbig/430714-abstract-glitch-art-digital-art.jpg");
+            background-size: cover;
+            background-position: bottom;
+            width: 500px;
+            height: 100px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 5px;
+            overflow-y: scroll;
+            font-size: 1.7em;
+            padding: 10px;
+            color: white;
+        }
+
+        .fragment {
+            border-radius: 3px;
+            color: white;
+            padding: 3px;
+        }
+
+        #fragments {
+            display: flex;
+            border: 1px solid blue;
+            border-radius: 5px;
+            padding: 10px;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        #hint {
+            font-size: 0.6em;
+            text-align: center;
+        }
+
+        .stylized-button {
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .stylized-button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main_cont">
+        <div id="unlocked">
+            <div id="hint">
+                Corrupted fragments<br>
+                Remove by clicking. Can remove up to 3 per message.
+            </div>
+            <div id="fragments">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            const main_cont = document.getElementById("main_cont")
+
+            //load ai reply
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
+            let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+            const origInput = input
+
+
+            //load chatdata
+            let swiped
+            let toCut
+            let removeCount
+            let toReplace
+            let userMesEdited
+            let chatData = `{{getvar::chatData}}`
+            if (chatData == "") {
+                triggerSlash(`/setvar key=chatData {}`)
+                swiped = false
+                toCut = true
+                removeCount = 3
+                toReplace = []
+                toReplace.push(genCorruptFragment())
+                toReplace.push(genCorruptFragment())
+                toReplace.push(genCorruptFragment())
+                toReplace.push(genCorruptFragment())
+                toReplace.push(genCorruptFragment())
+                userMesEdited = false
+            }
+            else {
+                chatData = JSON.parse(getVariables()["chatData"])
+                swiped = chatData["swiped"]
+                toCut = chatData["toCut"]
+                toReplace = chatData["toReplace"]
+                removeCount = chatData["removeCount"]
+                userMesEdited = false
+            }
+
+
+            function saveData() {
+                chatData = {
+                    "swiped": swiped,
+                    "toCut": toCut,
+                    "toReplace": toReplace,
+                    "removeCount": removeCount,
+                    "userMesEdited": userMesEdited
+                }
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+
+
+            //verifiers
+            if (input == "") {
+                main_cont.parentNode.removeChild(main_cont)
+                saveData()
+                return
+            }
+
+
+            const regexDialogues = /\"[^\"]+?\"/gi
+            let dialogues = getMatches(regexDialogues, input)
+            let fragmentsOrig = []
+
+
+            //swipe handler
+            eventOnce(tavern_events.MESSAGE_SWIPED, function () {
+                //change some data and save everything before swipe
+                swiped = true
+                toCut = true
+                saveData()
+            })
+            if(swiped) {
+                const swipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]["swipes"]
+                const swipeGen = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+                if(swipeGen === "...") {
+                    saveData()
+                    return
+                }
+                input = swipeGen
+                swiped = false
+            }
+            //main script func here
+            encryptFragments()
+            updateInput()
+            updateFragments()
+            updateAIMes()
+            saveData()
+
+
+            function encryptFragments() {
+                dialogues.forEach(dialogueObj => {
+                    let dialogue = dialogueObj["match"]
+                    toReplace.forEach(fragment => {
+                        dialogue = dialogue.replaceAll(RegExp(fragment, "gi"), atCount(fragment.length))
+                    });
+                    dialogues = replaceElement(dialogues, dialogueObj["match"], dialogue)
+                })
+            }
+
+
+            function onFragmentClick(e) {
+                if(removeCount <= 0) {
+                    return
+                }
+                
+                const elem = e.target
+                toReplace = toReplace.filter(fragment => fragment !== elem.innerText)
+                removeCount--
+                updateFragments()
+                saveData()
+            }
+
+
+            function getMatches(regex, str) {
+                const matches = [];
+                const matchR = str.matchAll(regex)
+                for (const match of matchR) {
+                    matches.push({
+                        match: match[0],
+                        index: match.index, // Use match.index instead of match["index"]
+                        original: match[0]
+                    });
+                }
+                return matches;
+            }
+
+
+            function genCorruptFragment() {
+                const c = ["b","c","d","f","g","h","j","k","l","m","n","p","q","r","s","t","v","w","x","z"]
+                const v = ["a", "e", "i", "o", "u", "y"]
+                const patterns = ["cv", "cc", "vc", "vv"]
+                let output = ""
+                while(output === "" || containsString(toReplace, output)) {
+                    output = ""
+                    let len = [1,2,2,2,2]
+                    let pattern = patterns[Math.floor(Math.random() * patterns.length)]
+                    len = len[Math.floor(Math.random() * len.length)]
+                    if(len === 2) {
+                        switch(pattern) {
+                            case "cv":
+                                output += c[Math.floor(Math.random() * c.length)]
+                                output += v[Math.floor(Math.random() * v.length)]
+                            break
+                            case "cc":
+                                output += c[Math.floor(Math.random() * c.length)]
+                                output += c[Math.floor(Math.random() * c.length)]
+                            break
+                            case "vc":
+                                output += v[Math.floor(Math.random() * v.length)]
+                                output += c[Math.floor(Math.random() * c.length)]
+                            break
+                            case "vv":
+                                output += v[Math.floor(Math.random() * v.length)]
+                                output += v[Math.floor(Math.random() * v.length)]
+                            break
+                            default: console.error("Error on gen corrupt fragment.")
+                        }
+                    }
+                    else {
+                        let cv = [c,v]
+                        cv = cv[Math.floor(Math.random() * cv.length)]
+                        output = cv[Math.floor(Math.random() * cv.length)]
+                    }
+                }
+
+                return output
+            }
+
+
+            function containsString(array, str) { //case insensitive
+                return array.some(item => item.toLowerCase() === str.toLowerCase());
+            }
+
+
+            
+            function atCount(count) {
+                const corrupt = ["#̷̶̴̸̶̢҉̷̷̷̸̨̡̨̢̛҉̴̴̶̡̨̢̨@̷̵̸̵̢̢̡̡̡̡̛̛҉̴̸̸̷̴̴̶̶̶̡̡", "#̵̛̳̬̽̀̐̿̑̎̀̄͊̅̄̂̂̋̐̆̍̑͌̈͛͊̈̌͊͌̀̈́̍́̈́̀̑́̃̈́́̿̂̍̎͂̐̆́͒̽̐́̎͂̅̇̀́̾̑͊̓͊̀̅̐͆̈́̓́̈́̓̎̀̉̒̕̚͠͝͝͠͠͝@̶̧̡̧̨̨̨̢̮̻̻͍͕͙̙̺̥̫̭̺̬̠̮̹̥̝̝͍͍̲̫̤͓̫̦̣͖̬̭̥̜̮̪̝̻̩̫͖̪̖̼̮͚̣̫͓̯͓̮̬̻̫̳̤͓̖͎̟̱̪̹̫̥̪̒̊̂͑͌́͊̂͋͆̌͑̈̍́̒̿̇̓̔̍̊̄̉̽͑̓̆̀̂̇̿̑̎̎̊͋͐͐̔̌̎͑̇̾̅͋͐̌̏̕͘͘͘͘͜͜͜͝͝ͅ", "☤ ̔̓#̴̑̀̔͘͟@̴̢̑͞ ☤", "🖎✁", "🖚🖌", "꧁꧂", "#̵̢̨̛̫̮̭̯͚̤̩̜͖͈̦̞͖̳̮̺͓͓͍͎̼̟̟̲̪̤̌̅̍̈̊̏̎̅̈́̈́̈́̏̈́̑́̎̈́͋̈͊̂̈́̌̀͗͛̈́̍́̒͗͂̽͒̾̈́̋́̾̈̅̓́̍́͂̄̀͗̓̆̿̔͋͂͑̀̀̈́̔̀̀̒̽̎̏͐͒͊̌̒̂͋͂͋̑̑̈́͒̔͆̒̈́͌̈́̕̕̕͘̚͜͝͝͝͠͠͝͠͝͝ͅ@̷̧̧̢̛̛̪̯̭̟̫̭̩̙͈̯̱̮̬̝̠̱͕̝͖̤̗͎̼̖̲͍́͂́́̎̅͗͑͒̎̽̇̅̈́̅̽̃̃̿̑͋̋̽̋̀̒̅̒̓͊͋͆̀̿̋̒͋̆̈́͊̓̇̇͑̌̐̽̀̈̌̊̈́̒̓̓̆̾̒͂̑́̆͛̂̏̌̅̓̾̐̍͌̑̏͑̔̆̓͋̔̂͛̔͋̚̚̚̕̚̕̕͠͝͝͝͠"]
+                let output = ""
+                for (let i = 0; i < count; i++) {
+                    output += corrupt[Math.floor(Math.random() * corrupt.length)]
+                }
+                return output
+            }
+
+
+            function getMatchesFragment(regex, str, dialogueI) {
+                let matches = []
+                for (const match of str.matchAll(regex)) {
+                    matches.push({
+                        match: match[0],
+                        index: match["index"],
+                        dialogueIdx: dialogueI
+                    })
+                };
+                return matches
+            }
+
+
+            function replaceElement(array, target, replacement) {
+                return array.map(obj => {
+                    if (target == obj["match"]) {
+                        return { ...obj, match: replacement }; // Replace 'name' property
+                    }
+                    return obj;
+                });
+            }
+
+
+            function updateFragments() {
+                const fragmentsElem = document.getElementById("fragments")
+                fragmentsElem.innerHTML = toReplace.map(fragment => {
+                    return `
+<span class="fragment stylized-button">${fragment}</span>`
+                }).join("")
+
+                const fragmentsArr = [...document.getElementsByClassName("fragment")]
+                changeFragmentsBGColor(fragmentsArr)
+                
+                fragmentsArr.forEach(element => {
+                    element.addEventListener("click", onFragmentClick)
+                });
+            }
+
+
+            function changeFragmentsBGColor(fragmentsArr) {
+                const colors = ['#2C3E50', '#34495E', '#16A085', '#27AE60', '#2980B9', '#8E44AD', '#C0392B', '#D35400', '#F39C12', '#7F8C8D']
+                fragmentsArr.forEach(element => {
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)]
+                    element.style.backgroundColor = randomColor
+                });
+            }
+
+
+            function updateInput() {
+                dialogues.forEach(element => {
+                    input = input.replace(element["original"], element["match"])
+                });
+            }
+
+
+            //for AI message manipulation
+            //display the manipulated AI message
+            //hide the original AI message
+            function updateAIMes() {
+                if (toCut) {
+                    toCut = false
+                    triggerSlash(`/sendas name="{{char}}" ${input} |
+/sendas name="{{char}}" <details><summary>Original</summary>
+${origInput}
+</details> |
+/cut {{lastMessageId}} |
+/hide {{lastMessageId}}
+                    `)
+                }
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

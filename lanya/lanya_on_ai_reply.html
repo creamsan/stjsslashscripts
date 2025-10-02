@@ -1,0 +1,485 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: monospace;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            border-radius: 7px;
+            padding: 10px;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(176, 43, 43);
+            padding: 5px;
+            color: white;
+        }
+
+        #ignore_btn {
+            background-color: rgb(100, 107, 56);
+        }
+
+        #input_unlock {
+            background: url("https://static.vecteezy.com/system/resources/previews/002/775/772/original/gradient-green-and-blue-abstract-geometric-background-free-vector.jpg");
+            background-position: 30%;
+            background-size: cover;
+            width: 500px;
+            height: 70px;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            padding: 10px;
+            color: white;
+        }
+
+        #unlocked {
+            background: url("https://static.vecteezy.com/system/resources/previews/002/775/772/original/gradient-green-and-blue-abstract-geometric-background-free-vector.jpg");
+            background-size: cover;
+            background-position: bottom;
+            width: 500px;
+            height: 100px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 5px;
+            overflow-y: scroll;
+            font-size: 1.7em;
+            padding: 10px;
+            color: white;
+        }
+
+        .fragment {
+            border-radius: 3px;
+            color: white;
+        }
+
+        button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 25px;
+            background-color: #4CAF50;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #input_fragment {
+            border: 1px solid rgb(152, 230, 152);
+            border-radius: 5px;
+        }
+
+        #fragments {
+            display: flex;
+            border: 1px solid blue;
+            border-radius: 5px;
+            padding: 10px;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not generate the expected output. Please swipe/regenerate.
+        </div>
+        <button id="ignore_btn">Ignore</button>
+    </div>
+    <div id="main_cont">
+        <div id="input_unlock">
+            <div style="font-size: 1.2em;" id="hint"></div>
+            <div>
+                <input type="text" id="input_fragment">
+                <button id="input_fragment_btn"><i class="fas fa-lock-open"></i></button>
+            </div>
+        </div>
+        <div id="unlocked">
+            <div>
+                Unlocked so far
+            </div>
+            <div id="fragments">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            //init error stuff
+            const main_cont = document.getElementById("main_cont")
+            const error = document.getElementById("error")
+            const error_msg = document.getElementById("error_msg")
+            const errorIgnoreBtn = document.getElementById("ignore_btn")
+            errorIgnoreBtn.addEventListener("click", function () {
+                main_cont.style.display = "flex"
+                error.style.display = "none"
+            })
+
+
+            //load ai reply
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
+            let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+            const origInput = input
+
+
+            //load chatdata
+            let toReplace
+            let toCut
+            let swiped
+            let unlockCount
+            let userMesEdited
+            let chatData = `{{getvar::chatData}}`
+            if (chatData == "") {
+                triggerSlash(`/setvar key=chatData {} |
+                /setvar key=secret {{random::They are aliens from another planet. After a devastating event, they now live their lives here on Earth.::They are the last remnants of an ancient civilization, tasked with protecting powerful relics hidden in the mountains that can alter reality.::They are the exiled descendants of a royal family, living in secrecy to protect their lineage from a powerful enemy seeking to erase their bloodline.::They are the last survivors of a cataclysmic event, living in isolation to preserve their knowledge and traditions while waiting for the world to heal.::They are just hunters. But they also hunt humans when given a chance.}}
+                `)
+                toReplace = ["Lanya", "{{user}}"]
+                toCut = true
+                swiped = false
+                unlockCount = 5
+                userMesEdited = false
+            }
+            else {
+                chatData = JSON.parse(getVariables()["chatData"])
+                toReplace = chatData["toReplace"]
+                toCut = chatData["toCut"]
+                swiped = chatData["swiped"]
+                unlockCount = chatData["unlockCount"]
+                userMesEdited = false
+            }
+
+
+            function saveData() {
+                chatData = {
+                    "toReplace": toReplace,
+                    "toCut": toCut,
+                    "swiped": swiped,
+                    "unlockCount": unlockCount,
+                    "userMesEdited": userMesEdited
+                }
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+
+
+            //verifiers
+            if (input == "") {
+                main_cont.parentNode.removeChild(main_cont)
+                saveData()
+                return
+            }
+
+
+            //main
+            const regexToGet = /\[\[(none|touched|kissed)\]\]/i
+            const toGet = regexToGet.test(input) ? (input.match(regexToGet))[0] : ""
+
+            const unlockTextBox = document.getElementById("input_fragment")
+            const unlockBtn = document.getElementById("input_fragment_btn")
+            const hint = document.getElementById("hint")
+            const fragmentsElem = document.getElementsByClassName("fragment")
+            let lettersToInput
+
+            if (/touch/i.test(toGet)) {
+                hint.innerText = "Enter 2 letter combination"
+                lettersToInput = 2
+            }
+            else if (/kiss/i.test(toGet)) {
+                hint.innerText = "Enter a letter"
+                lettersToInput = 1
+            }
+            else {
+                hint.innerText = "Enter 3 letter combination"
+                lettersToInput = 3
+            }
+
+            let toInput = ""
+            unlockTextBox.addEventListener("input", function (e) {
+                toInput = (e.target.value).trim()
+            })
+            unlockBtn.addEventListener("click", function () {
+                if (toInput.length != lettersToInput) {
+                    hint.innerText = "Please enter exactly " + lettersToInput + " letters"
+                }
+                else if (containsString(toReplace, toInput)) {
+                    hint.innerText = "This fragment is already unlocked."
+                }
+                else {
+                    toReplace.push(toInput)
+                    toCut = true
+                    updateFragments()
+                    saveData()
+                    unlockCount--
+                    updateUnlockUI()
+                }
+            })
+
+            const regexDialogues = /\"[^\"]+?\"/gi
+            let dialogues = getMatches(regexDialogues, input)
+
+            const regexWords = /[a-z]+/gi
+            let fragmentsOrig = []
+
+
+            //swipe handler
+            eventOnce(tavern_events.MESSAGE_SWIPED, function () {
+                //change some data and save everything before swipe
+                swiped = true
+                toCut = true
+                saveData()
+            })
+            if(swiped) {
+                const swipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]["swipes"]
+                const swipeGen = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+                if(swipeGen === "...") {
+                    saveData()
+                    return
+                }
+                input = swipeGen
+                swiped = false
+            }
+            preEncrypt()
+            encryptDialogue()
+            decryptFragments()
+            updateFragments()
+            updateInput()
+            updateAIMes()
+            saveData()
+            updateUnlockUI()
+
+
+            function updateUnlockUI() {
+                if (unlockCount <= 0) {
+                    document.getElementById("input_unlock").style.display = "none"
+                }
+            }
+
+
+            function updateFragments() {
+                const fragmentsElem = document.getElementById("fragments")
+                fragmentsElem.innerHTML = toReplace.map(fragment => {
+                    return `
+<span class="fragment">${fragment}</span>`
+                }).join("")
+
+                changeFragmentsBGColor()
+            }
+
+
+            function decryptFragments() {
+                if (toReplace.length <= 0) {
+                    return
+                }
+                dialogues.forEach((element, i) => {
+                    const fragmentsArr = fragmentsOrig.filter(f => f["dialogueIdx"] === i)
+                    let dialogue = element["match"]
+                    fragmentsArr.forEach(elementF => {
+                        dialogue = replaceAtIndex(dialogue, elementF["index"], elementF["match"])
+                    })
+                    dialogues = replaceElement(dialogues, element["match"], dialogue)
+                })
+            }
+
+
+            function encryptDialogue() {
+                const replacersTwo = [
+                    "BU", "BA", "GU", "GA", "WU", "WA", "DU", "DA", "FU", "FA"
+                ]
+                const replacersOne = [
+                    "B", "G", "W", "D", "F", "A", "U"
+                ]
+
+                dialogues.forEach(element => {
+                    let dialogue = element["match"]
+                    let words = getMatches(regexWords, dialogue)
+
+                    words.forEach(word => {
+                        let newWord = word["match"]
+                        const wordLen = newWord.length
+                        if (wordLen % 2 === 0) {
+                            if (wordLen > 2) {
+                                const loopCount = wordLen / 2
+                                for (let i = 0; i < loopCount; i++) {
+                                    let wordI = i * 2
+                                    let replacer = replacersTwo[Math.floor(Math.random() * replacersTwo.length)]
+                                    newWord = replaceAtIndex(newWord, wordI, replacer)
+                                }
+                            }
+                            else {
+                                newWord = replaceAtIndex(newWord, 0, replacersTwo[Math.floor(Math.random() * replacersTwo.length)])
+                            }
+                        }
+                        else if (wordLen % 2 === 1) {
+                            if (wordLen > 1) {
+                                const loopCount = Math.floor(wordLen / 2)
+                                for (let i = 0; i < loopCount; i++) {
+                                    let wordI = i * 2
+                                    let replacer = replacersTwo[Math.floor(Math.random() * replacersTwo.length)]
+                                    newWord = replaceAtIndex(newWord, wordI, replacer)
+                                }
+                                newWord = replaceAtIndex(newWord, wordLen - 1, replacersOne[Math.floor(Math.random() * replacersOne.length)])
+                            }
+                            else {
+                                newWord = replaceAtIndex(newWord, 0, replacersOne[Math.floor(Math.random() * replacersOne.length)])
+                            }
+                        }
+                        dialogue = dialogue.replace(RegExp(`${word["match"]}`, "i"), newWord)
+                    })
+                    dialogues = replaceElement(dialogues, element["match"], dialogue)
+                });
+            }
+
+
+            function updateInput() {
+                dialogues.forEach(element => {
+                    input = input.replace(element["original"], element["match"])
+                });
+            }
+
+
+            function preEncrypt() {
+                dialogues.forEach((elementD, i) => {
+                    let dialogue = elementD["original"]
+                    toReplace.forEach(fragment => {
+                        const regex = RegExp(fragment, "gi")
+                        const matches = getMatchesFragment(regex, dialogue, i)
+                        fragmentsOrig = [...fragmentsOrig, ...matches]
+                    })
+                })
+
+                dialogues.forEach((element, i) => {
+                    let dialogue = element["match"]
+                    const fragmentsArr = fragmentsOrig.filter(f => f["dialogueIdx"] === i)
+                    fragmentsArr.forEach(fragment => {
+                        const toMatch = fragment["match"]
+                        dialogue = replaceAtIndex(dialogue, fragment["index"], atCount(toMatch.length))
+                    });
+                    dialogues = replaceElement(dialogues, element["match"], dialogue)
+                })
+            }
+
+
+            function containsString(array, str) { //case insensitive
+                return array.some(item => item.toLowerCase() === str.toLowerCase());
+            }
+
+
+            function atCount(count) {
+                let output = ""
+                for (let i = 0; i < count; i++) {
+                    output += "@"
+                }
+                return output
+            }
+
+
+            function replaceElement(array, target, replacement) {
+                return array.map(obj => {
+                    if (target == obj["match"]) {
+                        return { ...obj, match: replacement }; // Replace 'name' property
+                    }
+                    return obj;
+                });
+            }
+
+
+            function replaceAtIndex(originalString, index, replacement) {
+                if (index < 0 || index >= originalString.length) {
+                    throw new Error("Error at function encryptDialogue.");
+                }
+                return originalString.substring(0, index) + replacement + originalString.substring(index + replacement.length);
+            }
+
+
+            function getMatches(regex, str) {
+                const matches = [];
+                const matchR = str.matchAll(regex)
+                for (const match of matchR) {
+                    matches.push({
+                        match: match[0],
+                        index: match.index, // Use match.index instead of match["index"]
+                        original: match[0]
+                    });
+                }
+                return matches;
+            }
+
+
+            function getMatchesFragment(regex, str, dialogueI) {
+                let matches = []
+                for (const match of str.matchAll(regex)) {
+                    matches.push({
+                        match: match[0],
+                        index: match["index"],
+                        dialogueIdx: dialogueI
+                    })
+                };
+                return matches
+            }
+
+
+            function changeFragmentsBGColor() {
+                const colors = ['#2C3E50', '#34495E', '#16A085', '#27AE60', '#2980B9', '#8E44AD', '#C0392B', '#D35400', '#F39C12', '#7F8C8D']
+                const fragmentsArr = [...document.getElementsByClassName("fragment")]
+                fragmentsArr.forEach(element => {
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)]
+                    element.style.backgroundColor = randomColor
+                });
+            }
+
+
+            function updateAIMes() {
+                if (toCut) {
+                    toCut = false
+                    triggerSlash(`/sendas name="{{char}}" ${input} |
+/sendas name="{{char}}" <details><summary>Original</summary>
+${origInput}
+</details> |
+/cut {{lastMessageId}} |
+/hide {{lastMessageId}}
+                    `)
+                }
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

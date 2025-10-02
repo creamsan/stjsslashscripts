@@ -1,0 +1,261 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main_cont"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            const main_cont = document.getElementById("main_cont")
+            const priceLadder = [
+                "100",
+                "200",
+                "300",
+                "500",
+                "1,000",
+                "2,000",
+                "4,000",
+                "8,000",
+                "16,000",
+                "32,000",
+                "64,000",
+                "125,000",
+                "250,000",
+                "500,000",
+                "1,000,000"
+            ]
+
+
+            //load data
+            let chatData = JSON.parse(getVariables()["chatData"])
+            let gameOver = chatData["gameOver"]
+            let winnings = chatData["winnings"]
+            let currQuestion = chatData["currQuestion"]
+            let unclickables = chatData["unclickables"]
+            let cooldown = chatData["cooldown"]
+            let phoneCooldown = chatData["phoneCooldown"]
+            let inPhone = chatData["inPhone"]
+            let savedBeforePhone = chatData["savedBeforePhone"]
+            let questionExpected = chatData["questionExpected"]
+            let toJB = chatData["toJB"]
+            let userMesEdited = chatData["userMesEdited"]
+
+
+            //save data
+            function saveData() {
+                chatData = {
+                    "gameOver": gameOver,
+                    "winnings": winnings,
+                    "currQuestion": currQuestion,
+                    "unclickables": unclickables,
+                    "cooldown": cooldown,
+                    "phoneCooldown": phoneCooldown,
+                    "inPhone": inPhone,
+                    "savedBeforePhone": savedBeforePhone,
+                    "questionExpected": questionExpected,
+                    "toJB": toJB,
+                    "userMesEdited": userMesEdited
+                }
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+
+
+            //edit handler - user side
+            if(userMesEdited) {
+                main_cont.parentNode.removeChild(main_cont)
+                saveData()
+                return
+            }
+            userMesEdited = true
+
+
+            if (gameOver) {
+                if (currQuestion >= 14) {
+                    toJB += `
+- The game is over. {{user}} won one million dollars.`
+                }
+                else {
+                    toJB += `
+- The game is over. {{user}} answered incorrectly. {{user}} won $${winnings}.`
+                }
+
+                await updateJB()
+                saveData()
+                return
+            }
+
+
+            if (inPhone) {
+                if (phoneCooldown > 0) {
+                    phoneCooldown--
+                    toJB += `
+- {{user}}'s quirky funny friend must be included in the chat.
+- {{user}}'s friend sounds confident, yet unreliable.
+- Be creative and humorous when playing the roles of friend and Gamehost.`
+                }
+                
+                await updateJB()
+                saveData()
+                return
+            }
+
+
+            if(savedBeforePhone.length > 0) {
+                savedBeforePhone = ""
+            }
+
+
+            switch (currQuestion) {
+                case 11:
+                case 12:
+                    toJB += `
+- Gamehost is visibly sweaty as {{user}} gets closer to the jackpot.`
+                    break
+                case 13:
+                case 14:
+                    toJB += `
+- Gamehost becomes passive aggressive towards {{user}}, with occasional Freudian slips and hurling random insults. It seems that they don't want the user to win the grand prize, so they're trying to put him under psychological pressure. Try to avoid sounding too obvious.`
+                    break;
+            }
+            
+
+            if (cooldown === 0) {
+                toJB += `
+- Next question for $${priceLadder[currQuestion]}.`
+                switch(currQuestion) {
+                    case 4:
+                    case 9:
+                        toJB += `
+- {{user}} reached safe haven.
+- {{user}} will be guaranteed take home $${priceLadder[currQuestion]} if he answers this correctly.`
+                    break;
+                    case 14:
+                        toJB += `
+- This is the final round.
+- {{user}} will win one million dollars if he answers this correctly.`
+                    case 5:
+                    case 10:
+                        winnings = priceLadder[currQuestion-1]
+                    break;
+                }
+
+                switch (currQuestion) {
+                    case 0:
+                    case 1:
+                    case 2:
+                        toJB += `
+- For the next response, create a multiple choice question and include it at the end of your response. The next question should be so easy that even a primary schooler could answer it.`
+                        break;
+                    case 3:
+                    case 4:
+                    case 5:
+                        toJB += `
+- For the next response, create a multiple choice question and include it at the end of your response. The next question should be slightly difficult.`
+                        break;
+                    case 6:
+                    case 7:
+                    case 8:
+                        toJB += `
+- For the next response, create a multiple choice question and include it at the end of your response. The next question should be really difficult.`
+                        break;
+                    case 9:
+                    case 10:
+                    case 11:
+                    case 12:
+                        toJB += `
+- For the next response, create a multiple choice question and include it at the end of your response. The next question should be the most difficult.`
+                        break;
+                    case 13:
+                    case 14:
+                        toJB += `
+- For the next response, create a multiple choice question and include it at the end of your response. The next question should be nonsensical with no basis in reality, an inside joke from the studio.`
+                        break;
+                }
+                toJB += `
+- Please closely follow this format:
+[Narration and dialogue here.]
+
+<question>
+Question: [The question here]
+A: [choice a]
+B: [choice b]
+C: [choice c]
+D: [choice d]
+Correct answer: [The letter of the correct answer here]
+
+Answers count: [Write a simulated poll of the audience's answers here. This will be used for the "Ask the Audience" lifeline. The harder the question, the more balanced and evenly distributed the numbers will be.]
+A: [audience count who answered A here]
+B: [audience count who answered B here]
+C: [audience count who answered C here]
+A: [audience count who answered D here]
+</question>
+
+Here's an example:
+<question>
+Question: What's the capital of Japan?
+A: Kyoto
+B: Osaka
+C: Tokyo
+D: Saitama
+Correct answer: C
+
+Answers count:
+A: 3
+B: 12
+C: 95
+D: 1
+</question>`
+                cooldown = 2
+                currQuestion++
+                questionExpected = true
+            }
+            else {
+                toJB += `
+- Do not post the question yet. Engage {{user}} with some small talk.`
+                questionExpected = false
+            }
+            cooldown--
+
+
+            await updateJB()
+            saveData()
+
+
+            async function updateJB() {
+                await insertOrAssignVariables({jbout: toJB})
+                toJB = ""
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

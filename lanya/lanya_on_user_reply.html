@@ -1,0 +1,76 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main_cont"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const main_cont = document.getElementById("main_cont")
+
+
+            //load chatdata
+            let chatData = JSON.parse(getVariables()["chatData"])
+            let toCut = chatData["toCut"]
+            let unlockCount = chatData["unlockCount"]
+            let userMesEdited = chatData["userMesEdited"]
+            let swiped = false
+
+
+            //edit handler - user side
+            if(userMesEdited) {
+                main_cont.parentNode.removeChild(main_cont)
+                saveData()
+                return
+            }
+            userMesEdited = true
+
+
+            toCut = true
+            unlockCount = 5
+            
+
+            saveData()
+
+
+            function saveData() {
+                chatData["toCut"] = toCut
+                chatData["unlockCount"] = unlockCount
+                chatData["userMesEdited"] = userMesEdited
+                chatData["swiped"] = swiped
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

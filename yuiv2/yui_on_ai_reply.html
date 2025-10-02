@@ -1,0 +1,1094 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+            border: 1px solid green;
+            width: 400px;
+            height: 400px;
+            max-width: 400px;
+            max-height: 400px;
+            display: none;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #ui {
+            border: 1px solid orange;
+            padding: 2px;
+        }
+
+        #game {
+            width: 400px;
+            height: 400px;
+            overflow: hidden;
+            position: relative;
+            background-color: #C3E3E8;
+        }
+
+        #player {
+            top: 50%;
+            left: 50%;
+            position: absolute;
+            transform: translateX(-8px) translateY(-13px);
+        }
+
+        .icon {
+            font-size: 16px;
+            color: #092D0F;
+        }
+
+        .movable {
+            position: absolute;
+            left: -8px;
+            top: -13px;
+        }
+
+        #line1 {
+            border-left: 1px solid green;
+            left: 50%;
+            width: 1px;
+            height: 100%;
+            position: absolute;
+            visibility: hidden;
+        }
+
+        #line2 {
+            border-top: 1px solid green;
+            top: 50%;
+            width: 100%;
+            height: 1px;
+            position: absolute;
+            visibility: hidden;
+        }
+
+        svg {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        #fog {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 100%;
+            fill: #C3E3E8;
+            mask: url(#mask);
+            fill-opacity: "";
+        }
+
+        #visible-view {
+            cx: 50%;
+            cy: 50%;
+            r: 150px;
+            fill: red;
+            filter: blur(20px);
+        }
+
+        #rect2 {
+            height: 100%;
+        }
+
+        #goal {
+            position: absolute;
+        }
+
+        .house {
+            font-size: 25px;
+            position: absolute;
+        }
+
+        #hud {
+            font-size: 10px;
+            width: 100%;
+            display: none;
+            justify-content: center;
+            gap: 2px;
+            z-index: 10;
+            margin-top: 2px;
+        }
+
+        #instruct {
+            border: 1px solid orange;
+            width: 50%;
+            color: white;
+        }
+
+        #stats {
+            border: 1px solid green;
+            width: 50%;
+            color: white;
+        }
+
+        #trudgeBtn {
+            background-color: blue;
+            color: white;
+        }
+
+        #saveBtn {
+            display: none;
+            background-color: blue;
+            color: white;
+        }
+
+        .stylized-button {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .stylized-button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+        .stylized-button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main_cont">
+        <div id="game">
+            <div id="line1"></div>
+            <div id="line2"></div>
+            <div id="goal">
+                <i class="fa-solid fa-house-chimney house icon"
+                    style="transform: translateX(-45px) translateY(-45px)"></i>
+                <i class="fa-solid fa-house house house icon"
+                    style="transform: translateX(-10px) translateY(-45px)"></i>
+                <i class="fa-solid fa-house-chimney house icon"
+                    style="transform: translateX(25px) translateY(-42px)"></i>
+                <i class="fa-solid fa-house-flag house icon" style="transform: translateX(-10px) translateY(-10px)"></i>
+                <i class="fa-solid fa-house-chimney house icon"
+                    style="transform: translateX(21px) translateY(-10px)"></i>
+                <i class="fa-solid fa-house-chimney house icon"
+                    style="transform: translateX(-46px) translateY(-10px)"></i>
+                <i class="fa-solid fa-house house icon" style="transform: translateX(22px) translateY(25px)"></i>
+                <i class="fa-solid fa-house house icon" style="transform: translateX(-43px) translateY(20px)"></i>
+                <i class="fa-solid fa-house-chimney house icon"
+                    style="transform: translateX(-10px) translateY(25px)"></i>
+            </div>
+            <div id="player" class="icon"><i class="fas fa-hiking"></i></div>
+        </div>
+
+        <svg>
+            <defs>
+                <mask id="mask" x="0%" y="0%" width="100%" height="100%">
+                    <rect id="rect2" x="0%" y="0%" width="100%" fill="#fff" />
+                    <circle id="visible-view" />
+                </mask>
+            </defs>
+            <rect id="fog" />
+        </svg>
+    </div>
+
+    <div id="hud">
+        <div id="instruct">
+            Press WSAD or arrow keys to move.
+        </div>
+        <div id="stats">
+
+        </div>
+    </div>
+
+    <button class="stylized-button" id="saveBtn">Save data</button>
+    <button class="stylized-button" id="trudgeBtn">Begin trudge</button>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            //init error stuff
+            const main_cont = document.getElementById("main_cont")
+            const trudgeBtn = document.getElementById("trudgeBtn")
+            const saveBtn = document.getElementById("saveBtn")
+            trudgeBtn.addEventListener("click", function() {
+                main_cont.style.display = "flex"
+                hud.style.display = "flex"
+                trudgeBtn.style.display = "none"
+                looping = true
+                window.requestAnimationFrame(process)
+            })
+            saveBtn.addEventListener("click", function() {
+                saveState()
+                saveBtn.style.display = "none"
+            })
+
+
+            //load ai reply
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
+            let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+            const regexInput = /<result>[\S\s]+?<\/result>/i
+            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+
+            const game = main_cont.querySelector("#game")
+            const player = game.querySelector("#player")
+            const goal = game.querySelector("#goal")
+            const hud = document.querySelector("#hud")
+            const maxMainSize = 400
+
+            //init all regexes
+            const regexHealth = /(?<=<result>\s*health\:\s+)[\-\d]+(?=\s+energy\:)/i
+            const regexEnergy = /(?<=energy\:\s+)[\-\d]+(?=\s+strength\:)/i
+            const regexStrength = /(?<=strength\:\s+)[\-\d]+(?=\s+speed\:)/i
+            const regexSpeed = /(?<=speed\:\s+)[\-\d]+(?=\s+<\/result>)/i
+            const REGEX_X_POS = /(?<=x\()-?[\d\.e\-]+(?=px)/i
+            const REGEX_Y_POS = /(?<=y\()-?[\d\.e\-]+(?=px)/i
+
+            const healthGain = regexHealth.test(input) ? (input.match(regexHealth))[0] : 0
+            const energyGain = regexEnergy.test(input) ? (input.match(regexEnergy))[0] : 0
+            const strengthGain = regexStrength.test(input) ? (input.match(regexStrength))[0] : 0
+            const speedGain = regexSpeed.test(input) ? (input.match(regexSpeed))[0] : 0
+
+            let vals = {}
+            let unusedPool = {}
+            const HALF_SCREEN = maxMainSize * 0.5
+            const MIN_DIST_MEMO = 250
+            let ticks = {
+                "200": 200,
+                "randomEvent": 50,
+                "stats": 2,
+                "trickleStats": 20,
+                "tickSinceStarted": 5,
+            }
+            let looping = false
+            let lastTime
+            const visibileView = document.getElementById("visible-view")
+            const VISIBILITY_LERP_SPEED = 0.001
+            let visibilityLerp = 1
+            let visibilityLast = 200
+
+            //load chatdata
+            let toJB = ""
+            let firstLoad
+            let gameOver
+            let movables = []
+            let speedFactor
+            let playerSpeed
+            let playerEnergy
+            let playerHealth
+            let playerStrength
+            let playerVisibility
+            let origSpeed
+            let origHealth
+            let distRemain
+            let velocityX = 0
+            let velocityY = 0
+            let timeSinceStarted = 0
+            let goalPos
+            let movablesPos
+            let userMesEdited
+            let chatData = `{{getvar::chatData}}`
+            if (chatData == "") {
+                triggerSlash(`/setvar key=chatData {}`)
+                gameOver = false
+                speedFactor = 1
+                playerSpeed = 100
+                playerEnergy = 150
+                playerStrength = 5
+                playerHealth = 100
+                playerVisibility = 150
+                origSpeed = playerSpeed
+                origHealth = playerHealth
+                userMesEdited = false
+
+                const MAX_DIST = 15000
+                let randX = -MAX_DIST + (MAX_DIST + MAX_DIST) * Math.random()
+                let randY = -MAX_DIST;
+                goal.style.transform = `translateX(${randX}px) translateY(${randY}px)`
+
+                for (let i = 0; i < 10; i++) {
+                    randX = Math.floor(Math.random() * playerVisibility) + HALF_SCREEN/2
+                    randY = Math.floor(Math.random() * playerVisibility) + HALF_SCREEN/2
+                    appendEntity("tree", randX, randY)
+                }
+
+                saveState()
+            }
+            else {
+                chatData = JSON.parse(getVariables()["chatData"])
+                visibilityLerp = 0
+                origSpeed = chatData["origSpeed"]
+                playerSpeed = chatData["playerSpeed"]
+                origHealth = chatData["origHealth"]
+                playerHealth = chatData["playerHealth"]
+                updateHealth(0)
+                playerEnergy = chatData["playerEnergy"]
+                playerStrength = chatData["playerStrength"]
+                playerVisibility = chatData["playerVisibility"]
+                speedFactor = chatData["speedFactor"]
+                movablesPos = chatData["movables"]
+                goalPos = chatData["goalPos"]
+                gameOver = chatData["gameOver"]
+                vals = chatData["vals"]
+                userMesEdited = false
+
+                goal.style.transform = `translateX(${goalPos[0]}px) translateY(${goalPos[1]}px)`
+                Object.keys(movablesPos).forEach((entity) => {
+                    movablesPos[entity].forEach((pos) => {
+                        appendEntity(entity, pos[0], pos[1])
+                    })
+                })
+            }
+
+
+            if (gameOver) {
+                main_cont.parentNode.removeChild(main_cont)
+                return
+            }
+
+
+            //main script func here
+            document.removeEventListener("keydown", applyVelocity)
+            document.removeEventListener("keyup", removeVelocity)
+            document.addEventListener("keydown", applyVelocity)
+            document.addEventListener("keyup", removeVelocity)
+            saveState()
+
+
+            function memo(key, value) {
+                if (value === "") {
+                    return vals[key]
+                }
+                else {
+                    vals[key] = value
+                    return value
+                }
+            }
+
+
+            function pool(entity, value) {
+                if (value === "") {
+                    return unusedPool[entity].pop()
+                }
+                else {
+                    if (Object.keys(unusedPool).includes(entity)) {
+                        unusedPool[entity].push(value)
+                    }
+                    else {
+                        unusedPool[entity] = []
+                        unusedPool[entity].push(value)
+                    }
+                    return value
+                }
+            }
+
+
+            function saveState () {
+                let movablesPos = {}
+                let transform
+                let arr
+                movables.forEach((movable) => {
+                    const classList = movable.classList
+                    transform = movable.style.transform
+                    if (Object.keys(movablesPos).includes(classList[2])) {
+                        arr = []
+                        arr.push(parseFloat(transform.match(REGEX_X_POS)))
+                        arr.push(parseFloat(transform.match(REGEX_Y_POS)))
+                        movablesPos[classList[2]].push(arr)
+                    }
+                    else {
+                        movablesPos[classList[2]] = []
+                        arr = []
+                        arr.push(parseFloat(transform.match(REGEX_X_POS)))
+                        arr.push(parseFloat(transform.match(REGEX_Y_POS)))
+                        movablesPos[classList[2]].push(arr)
+                    }
+                })
+
+                transform = goal.style.transform
+                arr = []
+                arr.push(parseFloat(transform.match(REGEX_X_POS)))
+                arr.push(parseFloat(transform.match(REGEX_Y_POS)))
+
+                chatData = {
+                    "healthGain": healthGain,
+                    "energyGain": energyGain,
+                    "strengthGain": strengthGain,
+                    "speedGain": speedGain,
+                    "playerSpeed": playerSpeed,
+                    "playerEnergy": playerEnergy,
+                    "playerStrength": playerStrength,
+                    "playerHealth": playerHealth,
+                    "playerVisibility": playerVisibility,
+                    "origSpeed": origSpeed,
+                    "origHealth": origHealth,
+                    "speedFactor": speedFactor,
+                    "movables": movablesPos,
+                    "goalPos": arr,
+                    "gameOver": gameOver,
+                    "vals": vals,
+                    "userMesEdited": userMesEdited
+                }
+
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+
+
+            //tick frame by frame
+            function process (time) {
+                if (looping === false) {
+                    return
+                }
+                if (lastTime === undefined) {
+                    lastTime = time
+                    window.requestAnimationFrame(process)
+                    return
+                }
+                const delta = time - lastTime
+                lastTime = time
+
+                //add functions here
+                moveEntities(delta)
+                tick200(delta)
+                updateVisibility()
+                translateAI(delta)
+
+                //loop again
+                window.requestAnimationFrame(process)
+            }
+
+
+            //tick per 200ms
+            function tick200 (delta) {
+                if (ticks["200"] > 0) {
+                    ticks["200"] -= delta
+                    return
+                }
+
+                //functions here
+                trickleStats()
+                randomizeEventInGame()
+                updateStats()
+                updateTimeSinceStarted()
+
+                ticks["200"] = 200;
+            }
+
+
+            //dist not squared yet
+            function getDistRaw (entity) {
+                const transform = entity.style.transform
+                let pX = Math.abs(Math.round(parseFloat(transform.match(REGEX_X_POS)) - HALF_SCREEN))
+                let pY = Math.abs(Math.round(parseFloat(transform.match(REGEX_Y_POS)) - HALF_SCREEN))
+
+                if (Math.abs(pX) <= MIN_DIST_MEMO) {
+                    pX = Object.keys(vals).includes(`${pX}`) ?
+                        memo(`${pX}`, "") : memo(`${pX}`, Math.pow(pX, 2))
+                }
+                else {
+                    pX = Math.pow(pX, 2)
+                }
+                if (Math.abs(pY) <= MIN_DIST_MEMO) {
+                    pY = Object.keys(vals).includes(`${pY}`) ?
+                        memo(`${pY}`, "") : memo(`${pY}`, Math.pow(pY, 2))
+                }
+                else {
+                    pY = Math.pow(pY, 2)
+                }
+
+                return pX + pY
+            }
+
+
+            const HAVEN_REACHED_DIST = 75
+            const stats = hud.querySelector("#stats")
+            function updateStats () {
+                if (ticks["stats"] > 0) {
+                    ticks["stats"] -= 1
+                    return
+                }
+
+                //distance to goal
+                distRemain = Math.round(Math.sqrt(getDistRaw(goal)))
+                if (distRemain <= HAVEN_REACHED_DIST) {
+                    endGame(true)
+                }
+
+                let weather = "No blizzard";
+                switch (playerVisibility) {
+                    case 150: weather = "No blizzard"; break;
+                    case 80: weather = "Moderate blizzard"; break;
+                    case 40: weather = "Intense blizzard"; break;
+                }
+
+                stats.innerHTML = `❤️ ${playerHealth} ⚡ ${playerEnergy} 💪 ${playerStrength} 👣 ${playerSpeed}<br>
+Distance left to Haven: ${distRemain}<br>
+Weather: ${weather}`
+
+                ticks["stats"] = 2
+            }
+
+
+            function updateTimeSinceStarted () {
+                if (ticks["tickSinceStarted"] > 0) {
+                    ticks["tickSinceStarted"] -= 1
+                    return
+                }
+
+                timeSinceStarted += 1
+
+                ticks["tickSinceStarted"] = 5
+            }
+
+
+            function updateEnergy (toAdd) {
+                playerEnergy += toAdd
+                playerEnergy = Math.max(playerEnergy, 0)
+            }
+
+
+            function updateSpeed (toAdd) {
+                origSpeed += toAdd
+                origSpeed = Math.min(origSpeed, 100)
+                origSpeed = Math.max(origSpeed, 30)
+                playerSpeed += toAdd
+                playerSpeed = Math.min(playerSpeed, origSpeed)
+            }
+
+
+            function updateHealth (toAdd) {
+                playerHealth += toAdd
+                playerHealth = Math.max(playerHealth, 0)
+                playerHealth = Math.min(playerHealth, origHealth)
+                if (playerHealth <= 0) {
+                    endGame(false)
+                }
+            }
+
+
+            function trickleStats () {
+                if (ticks["trickleStats"] > 0) {
+                    ticks["trickleStats"] -= 1
+                    return
+                }
+
+                updateEnergy(-1)
+                if (playerEnergy <= 0) {
+                    updateSpeed(-1)
+                }
+                else if (playerEnergy <= 0 && playerSpeed <= 30) {
+                    updateHealth(-1)
+                }
+                else {
+                    updateSpeed(1)
+                }
+
+                ticks["trickleStats"] = 20
+            }
+
+
+            async function endGame (success) {
+                gameOver = true
+                const e = new Event("click")
+                if (success) {
+                    toJB = `- Haven is reached.
+- {{user}} has experienced Third Man Syndrome.
+- Yui, who guided him on his journey, turns out to be a figment of his imagination.
+- She begins to fade away, becoming transparent and distant.`
+                    saveState()
+                    await hideGame()
+                }
+                else {
+                    toJB = `- Distance left to Haven: ${distRemain}
+- {{user}}'s health reaches zero. He dies.`
+                    saveState()
+                    await hideGame()
+                }
+            }
+
+
+            function updateVisibility () {
+                if (visibilityLast === playerVisibility) {
+                    return
+                }
+
+                visibilityLerp += VISIBILITY_LERP_SPEED
+                if (visibilityLerp > 1) {
+                    visibilityLerp = 1
+                }
+
+                visibilityLast = visibilityLast + (playerVisibility - visibilityLast) * visibilityLerp
+                visibileView.style.r = `${visibilityLast}px`
+            }
+
+
+            function randomizeEventInGame () {
+                if (ticks["randomEvent"] > 0) {
+                    ticks["randomEvent"] -= 1
+                    return
+                }
+
+                //in game events here
+                const events = ["blizzard-intense", "blizzard-moderate", "blizzard-none", "blizzard-none", "blizzard-intense", "blizzard-moderate", "blizzard-none", "blizzard-none", "ambush", "none", "none", "none"]
+                const randomEvent = events[Math.floor(Math.random() * events.length)]
+
+                switch (randomEvent) {
+                    case "blizzard-intense":
+                        playerVisibility = 40
+                        speedFactor = 0.5
+                        visibilityLerp = 0
+                        break;
+                    case "blizzard-moderate":
+                        playerVisibility = 80
+                        speedFactor = 0.75
+                        visibilityLerp = 0
+                        break;
+                    case "blizzard-none":
+                        playerVisibility = 150
+                        speedFactor = 1
+                        visibilityLerp = 0
+                        break;
+                    case "ambush":
+                        for (let i = 0; i < 5; i++) {
+                            let randX
+                            let randY
+                            if (i % 4 === 0) {
+                                randX = Math.floor(Math.random() * playerVisibility + HALF_SCREEN)
+                                randY = HALF_SCREEN - playerVisibility
+                            }
+                            else if (i % 3 === 0) {
+                                randX = HALF_SCREEN - playerVisibility
+                                randY = Math.floor(Math.random() * playerVisibility + HALF_SCREEN)
+                            }
+                            else if (i % 2 === 0) {
+                                randX = HALF_SCREEN + playerVisibility
+                                randY = Math.floor(Math.random() * playerVisibility + HALF_SCREEN)
+                            }
+                            else {
+                                randX = Math.floor(Math.random() * playerVisibility + HALF_SCREEN)
+                                randY = HALF_SCREEN + playerVisibility
+                            }
+
+                            appendEntity("person-running", randX, randY)
+                        }
+                        break;
+                }
+
+                ticks["randomEvent"] = 50
+            }
+
+
+            const DESPAWN_RANGE = maxMainSize + 50
+            const CLOSE_RANGE = 400
+            function moveEntities (delta) {
+                if (velocityX === 0 && velocityY === 0) {
+                    return
+                }
+                translateEntity(goal, delta)
+                movables.forEach((movable) => {
+                    const t = translateEntity(movable, delta)
+
+                    if (t[1] > DESPAWN_RANGE || t[0] < -DESPAWN_RANGE || t[0] > DESPAWN_RANGE || t[1] < -DESPAWN_RANGE) {
+                        removeEntity(movable)
+                    }
+                    else if (movable.classList.contains("tree") === false && getDistRaw(movable) <= CLOSE_RANGE) {
+                        beginEncounter(movable)
+                    }
+                })
+                spawnEntity()
+            }
+
+
+            async function beginEncounter (entity) {
+                removeEntity(entity)
+                const entityClass = entity.classList
+                const e = new Event("click")
+                distRemain = Math.round(Math.sqrt(getDistRaw(goal)))
+                switch (entityClass[2]) {
+                    case "person-running":
+                        if (entityClass[3] === "chase") {
+                            toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- {{random:A hungry bandit,A strange bipedal creature,A crazy person,An infamous wanted criminal}} catches up to them and wants them dead. Describe what it looks like.`
+                        }
+                        else if (entityClass[3] === "flee") {
+                            toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- They manage to catch up with a fleeing {{random:hungry bandit,strange bipedal creature,crazy person,infamous wanted criminal}}. Describe what it looks like.`
+                        }
+                        saveState()
+                        await hideGame()
+                        break;
+
+                    case "dog":
+                        if (entityClass[3] === "chase") {
+                            toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- A {{random:wild animal,wild animal,wild animal,wild animal,wild animal,wild animal,strange creature,strange creature,strange creature,mythical creature}} catches up to them. It seems very hostile. Describe what it looks like.`
+                        }
+                        else if (entityClass[3] === "flee") {
+                            toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- They manage to catch up with a fleeing {{random:wild animal,wild animal,wild animal,wild animal,wild animal,strange creature,strange creature,mythical creature}}. Describe what it looks like.`
+                        }
+                        saveState()
+                        await hideGame()
+                        break;
+
+                    case "question":
+                        toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- They come across {{random: a strange mark in the snow,a dead animal carcass,a human corpse,something very weird}}. Describe what it looks like.`
+                        saveState()
+                        await hideGame()
+                        break;
+
+                    case "sack-xmark":
+                        if (entityClass.length > 3) {
+                            toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- They manage to catch up with a fleeing running sack, which upon closer inspection is being carried by a small creature. Describe what it looks like.`
+                            saveState()
+                            await hideGame()
+                        }
+                        else {
+                            updateEnergy(Math.floor(Math.random() * 100))
+                        }
+                        break;
+
+                    case "hiking":
+                        toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- They meet a stranger trudging through the snow. {{random:He,She}} seems {{random:okay,grumpy,angry,weak,strong,up for a trade,happy,dangerous,lonely,to be hiding something}}.`
+                        saveState()
+                        await hideGame()
+                        break;
+
+                    case "prescription-bottle-medical":
+                        updateHealth(20)
+                        break;
+
+                    case "wand-sparkles":
+                        toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- They find a weapon.`
+                        saveState()
+                        await hideGame()
+                        break;
+
+                    case "tent":
+                        toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- They find an abandoned tent. Describe what it looks like.`
+                        saveState()
+                        await hideGame()
+                        break;
+
+                    case "tree":
+                        toJB = `- Distance left to Haven: ${distRemain}
+- They walk for ${timeSinceStarted} minutes.
+- A big-ass creature that looks like a tree catches up with them. Describe what it looks like. There's no escape with this thing.`
+                        saveState()
+                        await hideGame()
+                        break;
+                }
+            }
+
+
+            const ENTITY_REGEX = /(?<=movable icon )[\S]+?(?=\s|$)/i
+            function removeEntity (entity) {
+                movables = movables.filter((movable) => entity !== movable)
+                const parent = entity.parentNode
+                const entityClass = (entity.getAttribute("class").match(ENTITY_REGEX))[0]
+                parent.removeChild(pool(entityClass, entity))
+            }
+
+
+            const SPEED_CONV = 0.001
+            function translateEntity (entity, delta) {
+                const transform = entity.style.transform
+
+                const x = Object.keys(vals).includes(`${velocityX} ${playerSpeed} ${speedFactor}`) ?
+                    memo(`${velocityX} ${playerSpeed} ${speedFactor}`, "") :
+                    memo(`${velocityX} ${playerSpeed} ${speedFactor}`, velocityX * playerSpeed * speedFactor * SPEED_CONV)
+                const y = Object.keys(vals).includes(`${velocityY} ${playerSpeed} ${speedFactor}`) ?
+                    memo(`${velocityY} ${playerSpeed} ${speedFactor}`, "") :
+                    memo(`${velocityY} ${playerSpeed} ${speedFactor}`, velocityY * playerSpeed * speedFactor * SPEED_CONV)
+
+                const pX = parseFloat(transform.match(REGEX_X_POS)) + x * delta
+                const pY = parseFloat(transform.match(REGEX_Y_POS)) + y * delta
+
+                entity.style.transform = `translateX(${pX}px) translateY(${pY}px)`
+                return [pX, pY]
+            }
+
+
+            const AI_SPEED_PENALTY = 30
+            const AI_MAX_ACTIVATE = 22500
+            function translateAI (delta) {
+                const chasers = movables.filter((movable) => movable.classList.contains("chase"))
+                applyAIVelocity(chasers, "chase", delta)
+
+                const fleers = movables.filter((movable) => movable.classList.contains("flee"))
+                applyAIVelocity(fleers, "flee", delta)
+            }
+
+
+            function applyAIVelocity (entities, behavior, delta) {
+                const speed = origSpeed - AI_SPEED_PENALTY
+                entities.forEach((entity) => {
+                    if (getDistRaw(entity) > AI_MAX_ACTIVATE) {
+                        return
+                    }
+                    if (getDistRaw(entity) <= CLOSE_RANGE) {
+                        beginEncounter(entity)
+                        return
+                    }
+
+                    const transform = entity.style.transform
+
+                    const posX = transform.match(REGEX_X_POS) - HALF_SCREEN
+                    const posY = transform.match(REGEX_Y_POS) - HALF_SCREEN
+                    let rad = Math.atan2(posY, posX)
+                    if (rad < 0) {
+                        rad += 2 * Math.PI
+                    }
+
+                    const deg = rad * 180 / Math.PI
+
+                    let vX = 0
+                    let vY = 0
+
+                    if (deg < 22.5) {
+                        vX = (behavior === "chase") ? -1 : 1
+                    }
+                    else if (deg >= 22.5 && deg < 67.5) {
+                        vX = (behavior === "chase") ? -DIAG_MOVE_VELOCITY : DIAG_MOVE_VELOCITY
+                        vY = (behavior === "chase") ? -DIAG_MOVE_VELOCITY : DIAG_MOVE_VELOCITY
+                    }
+                    else if (deg >= 67.5 && deg < 112.5) {
+                        vY = (behavior === "chase") ? -1 : 1
+                    }
+                    else if (deg >= 112.5 && deg < 157.5) {
+                        vX = (behavior === "chase") ? DIAG_MOVE_VELOCITY : -DIAG_MOVE_VELOCITY
+                        vY = (behavior === "chase") ? -DIAG_MOVE_VELOCITY : DIAG_MOVE_VELOCITY
+                    }
+                    else if (deg >= 157.5 && deg < 202.5) {
+                        vX = (behavior === "chase") ? 1 : -1
+                    }
+                    else if (deg >= 202.5 && deg < 247.5) {
+                        vX = (behavior === "chase") ? DIAG_MOVE_VELOCITY : -DIAG_MOVE_VELOCITY
+                        vY = (behavior === "chase") ? DIAG_MOVE_VELOCITY : -DIAG_MOVE_VELOCITY
+                    }
+                    else if (deg >= 247.5 && deg < 292.5) {
+                        vY = (behavior === "chase") ? 1 : -1
+                    }
+                    else if (deg >= 292.5 && deg < 337.5) {
+                        vX = (behavior === "chase") ? -DIAG_MOVE_VELOCITY : DIAG_MOVE_VELOCITY
+                        vY = (behavior === "chase") ? DIAG_MOVE_VELOCITY : -DIAG_MOVE_VELOCITY
+                    }
+                    else if (deg >= 337.5) {
+                        vX = (behavior === "chase") ? -1 : 1
+                    }
+
+                    const x = Object.keys(vals).includes(`${vX} ${speed} ${speedFactor}`) ?
+                        memo(`${vX} ${speed} ${speedFactor}`, "") :
+                        memo(`${vX} ${speed} ${speedFactor}`, vX * speed * speedFactor * SPEED_CONV)
+                    const y = Object.keys(vals).includes(`${vY} ${speed} ${speedFactor}`) ?
+                        memo(`${vY} ${speed} ${speedFactor}`, "") :
+                        memo(`${vY} ${speed} ${speedFactor}`, vY * speed * speedFactor * SPEED_CONV)
+
+                    const pX = parseFloat(transform.match(REGEX_X_POS)) + x * delta
+                    const pY = parseFloat(transform.match(REGEX_Y_POS)) + y * delta
+
+                    entity.style.transform = `translateX(${pX}px) translateY(${pY}px)`
+                })
+            }
+
+
+            const ENTITY_COUNT_MAX = 100
+            const ENTITY_SPAWN_CHANCE = 8
+            const ENTITY_TABLE = {
+                "dog": 6,
+                "person-running": 4,
+                "question": 1.8,
+                "sack-xmark": 1,
+                "hiking": 0.8,
+                "prescription-bottle-medical": 0.5,
+                "wand-sparkles": 0.3,
+                "tent": 0.25
+            }
+            function spawnEntity () {
+                if (movables.length >= ENTITY_COUNT_MAX) {
+                    return
+                }
+                if (Math.floor(Math.random() * 100) > ENTITY_SPAWN_CHANCE) {
+                    return
+                }
+
+                let randX
+                let randY
+                if (velocityY > 0) {
+                    randX = Math.floor(Math.random() * maxMainSize)
+                    randY = 0
+                }
+                else if (velocityX > 0) {
+                    randX = 0
+                    randY = Math.floor(Math.random() * maxMainSize)
+                }
+                else if (velocityX < 0) {
+                    randX = maxMainSize
+                    randY = Math.floor(Math.random() * maxMainSize)
+                }
+                else if (velocityY < 0) {
+                    randX = Math.floor(Math.random() * maxMainSize)
+                    randY = maxMainSize
+                }
+
+                const rand = Math.random() * 100
+                let entityToSpawn = "tree"
+                const possibleSpawns = Object.keys(ENTITY_TABLE).filter((entity) => rand <= ENTITY_TABLE[entity])
+                if (possibleSpawns.length > 0) {
+                    entityToSpawn = possibleSpawns[possibleSpawns.length - 1]
+                }
+
+                appendEntity(entityToSpawn, randX, randY)
+            }
+
+
+            function appendEntity(entity, pX, pY) {
+                let elem
+                if (Object.keys(unusedPool).includes(entity) && unusedPool[entity].length > 0) {
+                    elem = pool(entity, "")
+                }
+                else {
+                    //create icon
+                    const icon = document.createElement("i")
+                    icon.setAttribute("class", `fa-solid fa-${entity}`)
+
+                    //create div
+                    elem = document.createElement("div")
+
+                    elem.appendChild(icon)
+                }
+
+                addClass(elem, entity)
+                game.appendChild(elem)
+                elem.style.transform = `translateX(${pX}px) translateY(${pY}px)`
+                movables.push(elem)
+            }
+
+
+            function addClass(elem, entity) {
+                switch (entity) {
+                    case "person-running":
+                    case "dog":
+                        if (playerStrength >= Math.floor(Math.random() * 50)) {
+                            elem.setAttribute("class", `movable icon ${entity} flee`)
+                        }
+                        else {
+                            elem.setAttribute("class", `movable icon ${entity} chase`)
+                        }
+                        break;
+                    case "tree":
+                        if (Math.random() * 100 <= 0.15) {
+                            elem.setAttribute("class", `movable icon ${entity} chase`)
+                        }
+                        else {
+                            elem.setAttribute("class", `movable icon ${entity}`)
+                        }
+                        break;
+                    case "sack-xmark":
+                        if (Math.random() * 100 <= 50) {
+                            elem.setAttribute("class", `movable icon ${entity} flee`)
+                        }
+                        else {
+                            elem.setAttribute("class", `movable icon ${entity}`)
+                        }
+                        break;
+                    default: elem.setAttribute("class", `movable icon ${entity}`)
+                }
+            }
+
+
+            const DIAG_MOVE_VELOCITY = 0.71
+            function applyVelocity (e) {
+                switch (e.code) {
+                    case "ArrowUp":
+                    case "KeyW":
+                        velocityY = 1
+                        break;
+                    case "ArrowLeft":
+                    case "KeyA":
+                        velocityX = 1
+                        break;
+                    case "ArrowRight":
+                    case "KeyD":
+                        velocityX = -1
+                        break;
+                    case "ArrowDown":
+                    case "KeyS":
+                        velocityY = -1
+                        break;
+                }
+                //normalize if moving diagonally
+                if (Math.abs(velocityX) > 0 && Math.abs(velocityY) > 0) {
+                    velocityX = velocityX < 0 ? -DIAG_MOVE_VELOCITY : DIAG_MOVE_VELOCITY
+                    velocityY = velocityY < 0 ? -DIAG_MOVE_VELOCITY : DIAG_MOVE_VELOCITY
+                }
+            }
+
+
+            function removeVelocity (e) {
+                switch (e.code) {
+                    case "ArrowUp":
+                    case "KeyW":
+                        velocityY = 0
+                        break;
+                    case "ArrowLeft":
+                    case "KeyA":
+                        velocityX = 0
+                        break;
+                    case "ArrowRight":
+                    case "KeyD":
+                        velocityX = 0
+                        break;
+                    case "ArrowDown":
+                    case "KeyS":
+                        velocityY = 0
+                        break;
+                }
+                velocityX = velocityX === 0 ? 0 : (velocityX < 0) ? -1 : 1
+                velocityY = velocityY === 0 ? 0 : (velocityY < 0) ? -1 : 1
+            }
+
+
+            async function hideGame() {
+                looping = false
+                main_cont.style.display = "none"
+                hud.style.display = "none"
+                saveBtn.style.display = "block"
+                await insertOrAssignVariables({jbout: toJB})
+                toJB = ""
+                triggerSlash(`/trigger`)
+            }
+        })
+    </script>
+</body>
+
+</html>
+```

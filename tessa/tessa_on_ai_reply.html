@@ -1,0 +1,322 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-image: url("https://wallpaperaccess.com/full/2106088.jpg");
+            padding: 5px;
+            margin: 0 auto;
+            color: white;
+        }
+
+        select {
+            color: #ffffff;
+            /* Light text in dropdown */
+            border: 1px solid #333;
+            /* Border color */
+            padding: 5px;
+            border-radius: 5px;
+        }
+
+        select option {
+            background-color: #1e1e1e;
+            /* Dark option background */
+            color: #ffffff;
+            /* Light option text */
+        }
+
+        .elements {
+            padding: 2px;
+            display: flex;
+            justify-content: space-evenly;
+            gap: 5px;
+            width: 450px;
+        }
+
+        .elementcont {
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .result {
+            width: 250px;
+            height: 25px;
+            font-size: 1.2em;
+            text-align: center;
+
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(189, 67, 67);
+        }
+
+        .stylized-button {
+            color: white;
+            padding: 3px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .stylized-button:hover {
+            transform: scale(1.05);
+        }
+        .stylized-button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not produce the expected output. Please swipe or regenerate. If this is the first message, you should ignore this.
+        </div>
+        <button class="stylized-button" id="ignore_btn">Ignore</button>
+    </div>
+    <div id="main_cont">
+        <div class='elements'>
+            <div class='elementcont'>
+                <label for='elem1'>First element</label><br>
+                <select class='element' id='elem1' name='elem1'></select>
+            </div>
+
+            <div class='elementcont'>
+                <label for='elem2'>Second element</label><br>
+                <select class='element' id='elem2' name='elem2'></select>
+            </div>
+        </div>
+
+        <div class='result'>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            //init html elems
+            const main_cont = document.getElementById("main_cont")
+            const error = document.getElementById("error")
+            const error_msg = document.getElementById("error_msg")
+            const errorIgnoreBtn = document.getElementById("ignore_btn")
+            errorIgnoreBtn.addEventListener("click", function () {
+                main_cont.style.display = "flex"
+                error.style.display = "none"
+            })
+
+
+            //load ai reply
+            let newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+            const regexInput = /<result>[\S\s]+?<\/result>/i
+            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+            
+
+            //load chatdata
+            let toJB = ""
+            let chatData = `{{getvar::chatData}}`
+            let options
+            let combinations
+            let expectingOutput
+            let prevSelect1
+            let prevSelect2
+            let userMesEdited
+            let newElement
+            if (chatData == "") {
+                triggerSlash(`/setvar key=chatData {} | /setvar key=herdesc Tessa is invisible. Only her sweet, cheerful voice can be heard. She comments on new creations with casual, easy conversation. She is adaptable and comfortable talking about anything. No matter how weird, lewd, or uncomfortable it may be. Though her motives are unclear, Tessa hints at a mysterious goal. She will reveal it in time.`)
+                options = ["Select an element", "Fire", "Water", "Earth", "Air", "Force", "Time"]
+                combinations = {}
+                expectingOutput = false
+                prevSelect1 = ""
+                prevSelect2 = ""
+                newElement = ""
+                userMesEdited = false
+            }
+            else {
+                chatData = JSON.parse(getVariables()["chatData"])
+                options = chatData["options"]
+                combinations = chatData["combinations"]
+                expectingOutput = chatData["expectingOutput"]
+                prevSelect1 = chatData["prevSelect1"]
+                prevSelect2 = chatData["prevSelect2"]
+                newElement = chatData["newElement"]
+                userMesEdited = false
+            }
+
+
+            //save data func
+            function saveData() {
+                chatData = {
+                    "options": options,
+                    "combinations": combinations,
+                    "expectingOutput": expectingOutput,
+                    "prevSelect1": prevSelect1,
+                    "prevSelect2": prevSelect2,
+                    "newElement": newElement,
+                    "userMesEdited": userMesEdited
+                }
+                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            }
+
+
+            //init all regexes and verify
+            if (input == "") {
+                main_cont.style.display = "none"
+                error.style.display = "flex"
+                saveData()
+            }
+
+            const regexElementName = /(?<=<result>\s*Name\:\s+)[\s\S]+?(?=\s+Description\:)/i
+            newElement = regexElementName.test(input) ? (input.match(regexElementName))[0] : ""
+            if (newElement == "" && expectingOutput) {
+                main_cont.style.display = "none"
+                error.style.display = "flex"
+                saveData()
+                return
+            }
+            expectingOutput = false
+
+
+            //main
+            const elemSelect1 = main_cont.querySelector("#elem1");
+            const elemSelect2 = main_cont.querySelector("#elem2");
+            const result = main_cont.querySelector(".result");
+            if(newElement != "") {
+                combinations[JSON.stringify([prevSelect1, prevSelect2])] = newElement
+                if(options.includes(newElement) === false) {
+                    options.push(newElement)
+                }
+            }
+            let optionsDisp = options.map((option) => {
+                if (option === "Select an element") {
+                    return `<option value='${option}' disabled selected>${option}</option>`
+                }
+                else {
+                    return `<option value='${option}'>${option}</option>`
+                }
+            }).join('')
+            const selectedElems = ["Select an element", "Select an element"]
+            const selectElem1 = (element) => {
+                selectedElems[0] = element
+                checkIfCompleted()
+            }
+            const selectElem2 = (element) => {
+                selectedElems[1] = element
+                checkIfCompleted()
+            }
+
+            elemSelect1.innerHTML = optionsDisp
+            elemSelect2.innerHTML = optionsDisp
+            elemSelect1.addEventListener("change", (e) => {
+                selectElem1(e.target.value)
+            })
+            elemSelect2.addEventListener("change", (e) => {
+                selectElem2(e.target.value)
+            })
+
+            function checkIfCompleted() {
+                let combiKey1 = JSON.stringify([selectedElems[0], selectedElems[1]])
+                let combiKey2 = JSON.stringify([selectedElems[1], selectedElems[0]])
+
+                if(selectedElems[0] === "Select an element" || selectedElems[1] === "Select an element") {
+                    saveData()
+                    return
+                }
+
+                let isComplete = false
+                let resultElem
+
+                if (combinations[combiKey1] !== undefined) {
+                    isComplete = true
+                    resultElem = combinations[combiKey1]
+                }
+                else if (combinations[combiKey2] !== undefined) {
+                    isComplete = true
+                    resultElem = combinations[combiKey2]
+                }
+
+                if (isComplete) {
+                    result.innerHTML = resultElem
+                    toJB += `
+- The combination ${selectedElems[0]} and ${selectedElems[1]} which {{user}} chose already exists, and it results to ${resultElem}. Let {{user}} try again.`
+                }
+                else {
+                    result.innerHTML = ""
+                    if (newElement.match(/(^tessa$|^me$)/i)) {
+                        triggerSlash(`/setvar key=herdesc {{user}} has finally created the "Waifu Goddess". By combining God, anime, robotics, and AI, Tessa finally materializes. She has a petite, slender frame with soft, pale skin and short white hair. Her delicate body is almost fragile. Her waist is narrow, accentuating her hips and buttocks. Her bright blue eyes shine with an ancient wisdom beyond her youthful appearance. A mystical symbol glows on Tessa's forehead, representing her divinity. Another glowing mark on her chest represents an ancient AI corporation that first revealed the power of AI to humanity. A goddess in the flesh, Tessa's very presence exudes an otherworldly aura.`)
+                    }
+                    triggerSlash(`/setvar key=thingname ${newElement}`)
+                    toJB += `
+- {{user}} selected ${selectedElems[0]} and ${selectedElems[1]} to be combined.
+Generate the result and include it at the beginning of your response:
+<result>
+Name: Its name
+Description: A short description
+"Flavor text"
+</result>
+
+Here's an example:
+<result>
+Name: Steam
+Description: Hot vapor that forms when fire meets water.
+"Wisps of steam curl up from the hissing water, warming the air."
+</result>`
+                    prevSelect1 = selectedElems[0]
+                    prevSelect2 = selectedElems[1]
+                    expectingOutput = true
+                }
+
+                updateJB()
+                saveData()
+            }
+
+
+            saveData()
+
+
+            function updateJB() {
+                triggerSlash(`/setvar key=jbout ${toJB}`)
+                toJB = ""
+            }
+        })
+    </script>
+</body>
+
+</html>
+```
