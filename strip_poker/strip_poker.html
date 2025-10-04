@@ -1,0 +1,843 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            width: 100%;
+            margin: 0;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 800px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+            padding: 5px
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(184, 48, 48);
+        }
+
+        .stylized-button {
+            color: white;
+            padding: 3px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .stylized-button:hover {
+            transform: scale(1.05);
+        }
+
+        .stylized-button:active {
+            transform: scale(0.95);
+        }
+
+        .move {
+            visibility: hidden;
+        }
+
+        #p1RaiseInput,
+        #p2RaiseInput {
+            width: 50px;
+            visibility: hidden;
+        }
+
+        .cardImg {
+            width: 100px;
+        }
+
+        #players {
+            background-color: brown;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 200px;
+            padding: 5px;
+        }
+
+        #exchange {
+            width: 700px;
+        }
+
+        #cards {
+            display: flex;
+            gap: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not produce the expected output. Please swipe or regenerate. If this is the first message, you
+            should ignore this.
+        </div>
+        <button class="stylized-button" id="ignore_btn">Ignore</button>
+    </div>
+    <div id="main_cont">
+        <div><button id="proceed">proceed</button></div>
+
+        <div id="players">
+            <div>
+                <div>{{user}}</div>
+                <div><button class="move" id="p1Check">Check</button></div>
+                <div><button class="move" id="p1Call">Call</button></div>
+                <div><button class="move" id="p1Raise">Raise</button><input id="p1RaiseInput" type="text"></div>
+                <div><button class="move" id="p1Fold">Fold</button></div>
+            </div>
+            <div>
+                <div>{{char}}</div>
+                <div><button class="move" id="p2Check">Check</button></div>
+                <div><button class="move" id="p2Call">Call</button></div>
+                <div><button class="move" id="p2Raise">Raise</button><input id="p2RaiseInput" type="text"></div>
+                <div><button class="move" id="p2Fold">Fold</button></div>
+            </div>
+        </div>
+
+        <div id="exchange">
+            <div id="cards"></div>
+            <button id="exchangeBtn">Exchange</button>
+        </div>
+    </div>
+
+    <script>
+        const main_cont = document.getElementById("main_cont")
+        //ai side
+        const error = document.getElementById("error")
+        function initError() {
+            const error_msg = document.getElementById("error_msg")
+            const errorIgnoreBtn = document.getElementById("ignore_btn")
+            errorIgnoreBtn.addEventListener("click", function () {
+                main_cont.style.display = "flex"
+                error.style.display = "none"
+            })
+        }
+
+
+        //ai side
+        let chatMessages
+        let input
+        async function loadAIReply() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]["swipes"]
+            input = newGenSwipes[newGenSwipes.length - 1]
+            const regexInput = /<result>[\S\s]+?<\/result>/i
+            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+        }
+
+
+        let toJB
+        let gameOver
+        let swiped
+        let toCut
+        let userMesEdited
+        let expectingOutput
+        let chatData
+        function loadChatData() {
+            if (chatData === undefined) {
+                //triggerSlash(`/setvar key=chatData {}`)
+                toJB = ""
+                gameOver = false
+                swiped = false
+                toCut = true
+                expectingOutput = false
+                userMesEdited = false
+            }
+            else {
+                chatData = JSON.parse(getVariables()["chatData"])
+                toJB = chatData["toJB"]
+                gameOver = chatData["gameOver"]
+                swiped = chatData["swiped"]
+                toCut = chatData["toCut"]
+                expectingOutput = chatData["expectingOutput"]
+                userMesEdited = false
+            }
+        }
+
+
+        function saveData() {
+            chatData["gameOver"] = gameOver
+            chatData["swiped"] = swiped
+            chatData["toCut"] = toCut
+            chatData["expectingOutput"] = expectingOutput
+            chatData["userMesEdited"] = userMesEdited
+            //triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+        }
+
+
+        //ai side
+        function verifyInputs(toVerify) {
+            if (gameOver) {
+                main_cont.parentNode.removeChild(main_cont)
+                return false
+            }
+
+            if (input == "") {
+                main_cont.style.display = "none"
+                error.style.display = "flex"
+                return false
+            }
+
+            for (const element of toVerify) {
+                if (element == "" && expectingOutput) {
+                    main_cont.style.display = "none"
+                    error.style.display = "flex"
+                    return false
+                }
+            }
+            expectingOutput = false
+
+            if (newGenSwipes["message_id"] === 0 || questionExpected === false) {
+                main_cont.style.display = "none"
+                error.style.display = "none"
+            }
+
+            return true
+        }
+
+
+        //ai side
+        async function handleSwipe() {
+            eventOnce(tavern_events.MESSAGE_SWIPED, function () {
+                //change some data and save everything before swipe
+                swiped = true
+                saveData()
+            })
+            if (swiped) {
+                newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]["swipes"]
+                const swipeGen = newGenSwipes[newGenSwipes.length - 1]
+                if (swipeGen === "...") {
+                    saveData()
+                    return
+                }
+                input = swipeGen
+                swiped = false
+            }
+        }
+
+
+        //user side
+        function handleUserMesEdit() {
+            if (userMesEdited) {
+                main_cont.parentNode.removeChild(main_cont)
+                saveData()
+                return
+            }
+            userMesEdited = true
+            swiped = false
+        }
+
+
+        //user side
+        async function updateJB() {
+            await insertOrAssignVariables({ jbout: toJB })
+            toJB = ""
+        }
+
+
+        //ai side
+        function updateAIMes() {
+            //display the manipulated AI message
+            //hide the original AI message
+            if (toCut) {
+                toCut = false
+                //                 triggerSlash(`/sendas name="{{char}}" ${input} |
+                //                     /sendas name="{{char}}" <details><summary>Original</summary>
+                // ${origInput}
+                // </details> |
+                //                     /cut {{lastMessageId}} |
+                //                     /hide {{lastMessageId}}
+                //                 `)
+            }
+        }
+
+
+        //main
+        document.addEventListener("DOMContentLoaded", async function () {
+            //init
+            //initError()
+            //await loadAIReply()
+            //loadChatData()
+
+            //intro handler
+            // if (newGenSwipes["message_id"] === 0) {
+
+            // }
+
+            //regexes here
+
+
+            // const toVerify = []
+            // if (verifyInputs(toVerify) === false) {
+            //     saveData()
+            //     return
+            // }
+
+            // await handleSwipe()
+            // handleUserMesEdit()
+
+            //main func start here
+
+
+            // await updateJB()
+            // saveData()
+
+            const proceedBtn = document.getElementById("proceed")
+            const p1Check = document.getElementById("p1Check")
+            const p1Call = document.getElementById("p1Call")
+            const p1Raise = document.getElementById("p1Raise")
+            const p1RaiseInput = document.getElementById("p1RaiseInput")
+            const p1Fold = document.getElementById("p1Fold")
+            const p2Check = document.getElementById("p2Check")
+            const p2Call = document.getElementById("p2Call")
+            const p2Raise = document.getElementById("p2Raise")
+            const p2RaiseInput = document.getElementById("p2RaiseInput")
+            const p2Fold = document.getElementById("p2Fold")
+            const cards = document.getElementById("cards")
+
+            const poker = new Poker()
+            const p1 = poker.player1
+            const p2 = poker.player2
+            const MOVES_AFTER_CHECK = ["Check", "Raise", "Fold"]
+            const MOVES_AFTER_CALL = ["Call", "Raise", "Fold"]
+            const MOVES_AFTER_RAISE = ["Call", "Raise", "Fold"]
+            const p1BtnsArr = [p1Check, p1Call, p1Raise, p1Fold, p1RaiseInput]
+            const p2BtnsArr = [p2Check, p2Call, p2Raise, p2Fold, p2RaiseInput]
+
+            proceedBtn.addEventListener("click", nextPokerPhase)
+
+            function nextPokerPhase() {
+                poker.nextPhase()
+                console.log(poker)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                switch (poker.phase) {
+                    case Poker.PHASE.PRE_EXCHANGE_BETS:
+                        if (poker.dealer.name === "{{user}}") {
+                            showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
+                        }
+                        else {
+                            showAvailableBtns(MOVES_AFTER_CHECK, p1BtnsArr)
+                        }
+                        break
+                    case Poker.PHASE.EXCHANGE:
+                        showCardsToExchange(p1.hand, cards)
+                        break
+                    case Poker.PHASE.POST_EXCHANGE_BETS:
+                        if (poker.dealer.name === "{{user}}") {
+                            showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
+                        }
+                        else {
+                            showAvailableBtns(MOVES_AFTER_CHECK, p1BtnsArr)
+                        }
+                        break
+                }
+            }
+
+            p1Call.addEventListener("click", function () {
+                poker.playerMove(p1, Poker.MOVES.CALL, poker.lastBet)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                showAvailableBtns(MOVES_AFTER_CALL, p2BtnsArr)
+                console.log(poker)
+            })
+            p1Check.addEventListener("click", function () {
+                poker.playerMove(p1, Poker.MOVES.CHECK)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                if (poker.lastBetter === p1) {
+                    nextPokerPhase()
+                }
+                else {
+                    showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
+                }
+                console.log(poker)
+            })
+            p1Raise.addEventListener("click", function () {
+                poker.playerMove(p1, Poker.MOVES.RAISE, p1RaiseInput.value)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                console.log(poker)
+            })
+            p1Fold.addEventListener("click", function () {
+                poker.playerMove(p1, Poker.MOVES.FOLD)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                console.log(poker)
+            })
+            p2Call.addEventListener("click", function () {
+                poker.playerMove(p2, Poker.MOVES.CALL, poker.lastBet)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                showAvailableBtns(MOVES_AFTER_CALL, p1BtnsArr)
+                console.log(poker)
+            })
+            p2Check.addEventListener("click", function () {
+                poker.playerMove(p2, Poker.MOVES.CHECK)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                if (poker.lastBetter === p2) {
+                    nextPokerPhase()
+                }
+                else {
+                    showAvailableBtns(MOVES_AFTER_CHECK, p1BtnsArr)
+                }
+                console.log(poker)
+            })
+            p2Raise.addEventListener("click", function () {
+                poker.playerMove(p2, Poker.MOVES.RAISE, p2RaiseInput.value)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                console.log(poker)
+            })
+            p2Fold.addEventListener("click", function () {
+                poker.playerMove(p2, Poker.MOVES.FOLD)
+                hideMoveBtns([...p1BtnsArr, ...p2BtnsArr])
+                console.log(poker)
+            })
+        })
+
+
+        function getCardImgLink(card) {
+            const uiCards = {
+                'AS': "ace_of_spades",
+                '2S': "2_of_spades",
+                '3S': "3_of_spades",
+                '4S': "4_of_spades",
+                '5S': "5_of_spades",
+                '6S': "6_of_spades",
+                '7S': "7_of_spades",
+                '8S': "8_of_spades",
+                '9S': "9_of_spades",
+                'TS': "10_of_spades",
+                'JS': "jack_of_spades",
+                'QS': "queen_of_spades",
+                'KS': "king_of_spades",
+                'AC': "ace_of_clubs",
+                '2C': "2_of_clubs",
+                '3C': "3_of_clubs",
+                '4C': "4_of_clubs",
+                '5C': "5_of_clubs",
+                '6C': "6_of_clubs",
+                '7C': "7_of_clubs",
+                '8C': "8_of_clubs",
+                '9C': "9_of_clubs",
+                'TC': "10_of_clubs",
+                'JC': "jack_of_clubs",
+                'QC': "queen_of_clubs",
+                'KC': "king_of_clubs",
+                'AD': "ace_of_diamonds",
+                '2D': "2_of_diamonds",
+                '3D': "3_of_diamonds",
+                '4D': "4_of_diamonds",
+                '5D': "5_of_diamonds",
+                '6D': "6_of_diamonds",
+                '7D': "7_of_diamonds",
+                '8D': "8_of_diamonds",
+                '9D': "9_of_diamonds",
+                'TD': "10_of_diamonds",
+                'JD': "jack_of_diamonds",
+                'QD': "queen_of_diamonds",
+                'KD': "king_of_diamonds",
+                'AH': "ace_of_hearts",
+                '2H': "2_of_hearts",
+                '3H': "3_of_hearts",
+                '4H': "4_of_hearts",
+                '5H': "5_of_hearts",
+                '6H': "6_of_hearts",
+                '7H': "7_of_hearts",
+                '8H': "8_of_hearts",
+                '9H': "9_of_hearts",
+                'TH': "10_of_hearts",
+                'JH': "jack_of_hearts",
+                'QH': "queen_of_hearts",
+                'KH': "king_of_hearts"
+            }
+
+            return `https://raw.githubusercontent.com/hayeah/playing-cards-assets/refs/heads/master/svg-cards/${uiCards[card]}.svg`
+        }
+
+
+        function showCardsToExchange(cards, cardsElem) {
+            const toHtml = cards.map(card => {
+                return `<img class="cardImg" src="${getCardImgLink(card)}" alt="${card}">`
+            }).join('')
+            cardsElem.innerHTML = toHtml
+
+            const clickableCards = [...document.getElementsByClassName("cardImg")]
+            clickableCards.forEach(element => {
+                element.addEventListener("click", onCardUIClick)
+            });
+        }
+
+
+        function onCardUIClick(e) {
+            console.log(e.target)
+        }
+
+
+        function hideMoveBtns(arr) {
+            arr.forEach(element => {
+                element.style.visibility = "hidden"
+            });
+        }
+
+
+        function showAvailableBtns(moves, playerBtns) {
+            let visible = []
+            moves.forEach(move => {
+                visible = [...visible, ...playerBtns.filter(btn => RegExp(move, "i").test(btn.id))]
+            });
+            visible.forEach(element => {
+                element.style.visibility = "visible"
+            });
+        }
+
+
+        class Deck {
+            static allCards = [
+                'AS', '2S', '3S', '4S', '5S', '6S', '7S', '8S', '9S', 'TS', 'JS', 'QS', 'KS',
+                'AC', '2C', '3C', '4C', '5C', '6C', '7C', '8C', '9C', 'TC', 'JC', 'QC', 'KC',
+                'AD', '2D', '3D', '4D', '5D', '6D', '7D', '8D', '9D', 'TD', 'JD', 'QD', 'KD',
+                'AH', '2H', '3H', '4H', '5H', '6H', '7H', '8H', '9H', 'TH', 'JH', 'QH', 'KH'
+            ]
+
+            #cards
+            constructor() {
+                this.resetCards()
+            }
+
+            get cards() {
+                return this.#cards
+            }
+
+            shuffle() {
+                for (let i = this.#cards.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1)); // Random index
+                    [this.#cards[i], this.#cards[j]] = [this.#cards[j], this.#cards[i]]; // Swap elements
+                }
+            }
+
+            resetCards() {
+                this.#cards = [...Deck.allCards]
+            }
+
+            getCard() {
+                return this.#cards.pop()
+            }
+        }
+
+
+        class Poker {
+            static PHASE = {
+                ASSIGN_DEALER: 0,
+                PLACE_ANTE: 1,
+                DEAL_CARDS: 2,
+                PRE_EXCHANGE_BETS: 3,
+                EXCHANGE: 4,
+                POST_EXCHANGE_BETS: 5,
+                SHOWDOWN: 6
+            }
+
+            get phase() {
+                return this.#phase
+            }
+
+            static HANDS = {
+                HIGH_CARD: 0,
+                ONE_PAIR: 1,
+                TWO_PAIR: 2,
+                THREE_OF_A_KIND: 3,
+                STRAIGHT: 4,
+                FLUSH: 5,
+                FULL_HOUSE: 6,
+                FOUR_OF_A_KIND: 7,
+                STRAIGHT_FLUSH: 8,
+                ROYAL_FLUSH: 9
+            }
+
+            static MOVES = {
+                CHECK: 0,
+                CALL: 1,
+                RAISE: 2,
+                FOLD: 3
+            }
+
+            #firstP
+            #secondP
+            #deck
+            #player1
+            #player2
+            #dealer
+            #phase
+            #pot
+            #lastBet
+            #lastMove
+            #lastBetter
+            #ante
+            constructor() {
+                this.#deck = new Deck()
+                this.#deck.shuffle()
+                this.#player1 = new Player("{{user}}", 100)
+                this.#player2 = new Player("{{char}}", 100)
+                this.#dealer = this.#player2
+                this.#phase = -1
+                this.#pot = 0
+                this.#lastBet = 0
+                this.#ante = 10
+            }
+
+            get player1() {
+                return this.#player1
+            }
+
+            get player2() {
+                return this.#player2
+            }
+
+            get dealer() {
+                return this.#dealer
+            }
+
+            get lastBet() {
+                return this.#lastBet
+            }
+
+            get lastBetter() {
+                return this.#lastBetter
+            }
+
+            nextPhase() {
+                this.#phase++
+                if (this.#phase > 6) {
+                    this.#phase = 0
+                }
+
+                switch (this.#phase) {
+                    case Poker.PHASE.ASSIGN_DEALER:
+                        this.#player1.emptyHand()
+                        this.player2.emptyHand()
+                        this.#dealer = this.#dealer === this.#player1 ? this.#player2 : this.#player1
+                        this.#firstP = this.#dealer
+                        this.#secondP = this.#dealer === this.#player1 ? this.#player2 : this.#player1
+                        console.log("Dealer: " + this.#dealer.name)
+                        break
+                    case Poker.PHASE.PLACE_ANTE:
+                        this.playerMove(this.#firstP, Poker.MOVES.CALL, this.#ante)
+                        this.playerMove(this.#secondP, Poker.MOVES.CALL, this.#ante)
+                        this.#lastBetter = this.#firstP
+                        break
+                    case Poker.PHASE.DEAL_CARDS:
+                        for (let i = 0; i < 5; i++) {
+                            this.#firstP.addCardToHand(this.#deck.getCard())
+                            this.#secondP.addCardToHand(this.#deck.getCard())
+                        }
+                        break
+                    case Poker.PHASE.PRE_EXCHANGE_BETS:
+
+                        break
+                    case Poker.PHASE.EXCHANGE:
+
+                        break
+                    case Poker.PHASE.POST_EXCHANGE_BETS:
+
+                        break
+                    case Poker.PHASE.SHOWDOWN:
+                        let firstPHand = this.evaluateHand(this.#firstP.hand)
+                        let secondPHand = this.evaluateHand(this.#secondP.hand)
+
+                        if (Poker.HANDS[firstPHand] > Poker.HANDS[secondPHand]) {
+                            console.log("Winner: " + this.#firstP.name + " " + this.descriptiveHand(firstPHand))
+                            this.#firstP.earn(this.#pot)
+                        } else if (Poker.HANDS[firstPHand] < Poker.HANDS[secondPHand]) {
+                            console.log("Winner: " + this.#secondP.name + " " + this.descriptiveHand(secondPHand))
+                            this.#secondP.earn(this.#pot)
+                        } else {
+                            this.compareHighCards(this.#firstP.hand, this.#secondP.hand, this.descriptiveHand(firstPHand), this.descriptiveHand(secondPHand));
+                        }
+                        this.#pot = 0
+                        this.#deck.resetCards()
+                        this.#deck.shuffle()
+                        break
+                    default: console.error("Error on next poker phase")
+                }
+            }
+
+            playerMove(player, move, bet = 0) {
+                switch (this.#phase) {
+                    case Poker.PHASE.ASSIGN_DEALER:
+                    case Poker.PHASE.DEAL_CARDS:
+                    case Poker.PHASE.SHOWDOWN:
+                        console.error("Player move invalid. Can't make a move during this phase.")
+                        return
+                }
+                switch (move) {
+                    case Poker.MOVES.CHECK:
+
+                        break
+                    case Poker.MOVES.CALL:
+                        player.bet(bet)
+                        this.#pot += bet
+                        this.#lastBet = bet
+                        this.#lastMove = move
+                        break
+                    case Poker.MOVES.RAISE:
+                        player.bet(bet)
+                        this.#pot += bet
+                        this.#lastBet = bet
+                        this.#lastMove = move
+                        this.#lastBetter = player
+                        break
+                    case Poker.MOVES.FOLD:
+                        let winner = player === this.player1 ? this.player1 : this.player2
+                        winner.earn(this.#pot)
+                        this.#pot = 0
+                        this.#phase = Poker.PHASE.SHOWDOWN
+                        break
+                }
+            }
+
+            compareHighCards(hand1, hand2, hand1Desc, hand2Desc) {
+                const valueOrder = "23456789TJQKA";
+
+                const hand1Values = hand1.map(card => card[0]).sort((a, b) => valueOrder.indexOf(b) - valueOrder.indexOf(a));
+                const hand2Values = hand2.map(card => card[0]).sort((a, b) => valueOrder.indexOf(b) - valueOrder.indexOf(a));
+
+                for (let i = 0; i < hand1Values.length; i++) {
+                    const hand1ValueIndex = valueOrder.indexOf(hand1Values[i]);
+                    const hand2ValueIndex = valueOrder.indexOf(hand2Values[i]);
+
+                    if (hand1ValueIndex > hand2ValueIndex) {
+                        console.log("Winner: " + this.#firstP.name + " " + hand1Desc)
+                        this.#firstP.earn(this.#pot)
+                        return
+                    } else if (hand1ValueIndex < hand2ValueIndex) {
+                        console.log("Winner: " + this.#secondP.name + " " + hand2Desc)
+                        this.#secondP.earn(this.#pot)
+                        return
+                    }
+                }
+                //tie
+                console.log("Tie")
+                this.#firstP.earn(this.#pot / 2)
+                this.#secondP.earn(this.#pot / 2)
+            }
+
+            evaluateHand(cards) {
+                const values = cards.map(card => card[0]);
+                const suits = cards.map(card => card[1]);
+
+                const valueCounts = {};
+                values.forEach(value => {
+                    valueCounts[value] = (valueCounts[value] || 0) + 1;
+                });
+
+                const uniqueValues = Object.keys(valueCounts);
+                const counts = Object.values(valueCounts).sort((a, b) => b - a);
+
+                const isFlush = new Set(suits).size === 1;
+                const isStraight = uniqueValues.length === 5 && (Math.max(...uniqueValues.map(v => "23456789TJQKA".indexOf(v))) - Math.min(...uniqueValues.map(v => "23456789TJQKA".indexOf(v))) === 4);
+                const royalFlushValues = ['A', 'K', 'Q', 'J', 'T'];
+                const hasRoyalFlush = royalFlushValues.every(value => uniqueValues.includes(value)) && isFlush;
+
+                if (hasRoyalFlush) return Poker.HANDS.ROYAL_FLUSH
+                if (isFlush && isStraight) return Poker.HANDS.STRAIGHT_FLUSH
+                if (counts[0] === 4) return Poker.HANDS.FOUR_OF_A_KIND
+                if (counts[0] === 3 && counts[1] === 2) return Poker.HANDS.FULL_HOUSE
+                if (isFlush) return Poker.HANDS.FLUSH
+                if (isStraight) return Poker.HANDS.STRAIGHT
+                if (counts[0] === 3) return Poker.HANDS.THREE_OF_A_KIND
+                if (counts[0] === 2 && counts[1] === 2) return Poker.HANDS.TWO_PAIR
+                if (counts[0] === 2) return Poker.HANDS.ONE_PAIR
+                return Poker.HANDS.HIGH_CARD
+            }
+
+            descriptiveHand(handEnum) {
+                switch (handEnum) {
+                    case Poker.HANDS.HIGH_CARD: return "High Card"
+                    case Poker.HANDS.ONE_PAIR: return "One Pair"
+                    case Poker.HANDS.TWO_PAIR: return "Two Pair"
+                    case Poker.HANDS.THREE_OF_A_KIND: return "Three of a Kind"
+                    case Poker.HANDS.STRAIGHT: return "Straight"
+                    case Poker.HANDS.FLUSH: return "Flush"
+                    case Poker.HANDS.FULL_HOUSE: return "Full House"
+                    case Poker.HANDS.FOUR_OF_A_KIND: return "Four of a Kind"
+                    case Poker.HANDS.STRAIGHT_FLUSH: return "Straight Flush"
+                    case Poker.HANDS.ROYAL_FLUSH: return "Royal Flush"
+                }
+            }
+        }
+
+
+        class Player {
+            #name
+            #hand
+            #wager
+            constructor(name, wager) {
+                this.#name = name
+                this.#hand = []
+                this.#wager = wager
+            }
+
+            addCardToHand(card) {
+                this.#hand.push(card)
+            }
+
+            earn(amount) {
+                this.#wager += amount
+            }
+
+            discard(card) {
+                this.#hand = this.#hand.filter(c => c !== card)
+            }
+
+            bet(amount) {
+                this.#wager -= amount
+            }
+
+            emptyHand() {
+                this.#hand = []
+            }
+
+            get name() {
+                return this.#name
+            }
+
+            get hand() {
+                return this.#hand
+            }
+
+            get wager() {
+                return this.#wager
+            }
+        }
+
+
+    </script>
+</body>
+
+</html>
+```
