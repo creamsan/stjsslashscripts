@@ -168,6 +168,8 @@
     </div>
 
     <div><button id="proceed">proceed</button></div>
+    <div><button id="save">save</button></div>
+    <div><button id="load">load</button></div>
     <div>
         <div><button class="move" id="p2Check">Check</button></div>
         <div><button class="move" id="p2Call">Call</button></div>
@@ -186,8 +188,25 @@
             ]
 
             #cards
-            constructor() {
-                this.resetCards()
+
+            static fromJSON(json) {
+                const data = JSON.parse(json)
+                return new Deck(data.cards)
+            }
+
+            toJSON() {
+                return {
+                    cards: this.#cards
+                }
+            }
+
+            constructor(cards = []) {
+                if (cards.length === 0) {
+                    this.resetCards()
+                }
+                else {
+                    this.#cards = cards
+                }
             }
 
             get cards() {
@@ -259,16 +278,83 @@
             #ante
             #winner
             #roundWinner
-            constructor() {
-                this.#deck = new Deck()
-                this.#deck.shuffle()
-                this.#player1 = new Player("{{user}}", 100)
-                this.#player2 = new Player("{{char}}", 100)
-                this.#dealer = this.#player2
-                this.#phase = -1
-                this.#pot = 0
-                this.#lastBet = 0
-                this.#ante = 10
+
+            static fromJSON(json) {
+                const data = JSON.parse(json)
+                const deck = Deck.fromJSON(JSON.stringify(data.deck))
+                const p1 = Player.fromJSON(JSON.stringify(data.player1))
+                const p2 = Player.fromJSON(JSON.stringify(data.player2))
+                const fP = data.firstP === data.player1 ? p1 : p2
+                const sP = data.secondP === data.player2 ? p2 : p1
+                const dealer = data.dealer === data.player1 ? p1 : p2
+                const lastBetter = data.lastBetter === data.player1 ? p1 : p2
+                const winner = Object.keys(data.winner).length === 0 ? {} : data.winner === data.player1 ? p1 : p2
+                const roundWinner = {
+                    player: Object.keys(data.roundWinner.player).length === 0 ? {} : data.roundWinner.player === data.player1 ? p1 : p2,
+                    hand: data.roundWinner.hand
+                }
+                return new Poker(fP, sP, deck, p1, p2, dealer, data.phase, data.pot, data.lastBet, lastBetter, data.ante, winner, roundWinner)
+            }
+
+            toJSON() {
+                const p1Json = this.#player1.toJSON()
+                const p2Json = this.#player2.toJSON()
+                const fPJson = this.#firstP === this.#player1 ? p1Json : p2Json
+                const sPJson = this.#secondP === this.#player2 ? p2Json : p1Json
+                const dealerJson = this.#dealer === this.#player1 ? p1Json : p2Json
+                const lastBetterJson = this.#lastBetter === this.#player1 ? p1Json : p2Json
+                const winnerJson = Object.keys(this.#winner).length === 0 ? {} : this.winner === this.#player1 ? p1Json : p2Json
+                const roundWinnerJson = Object.keys(this.#roundWinner).length === 0 ? {} : {
+                    player: this.#roundWinner.player === this.#player1 ? p1Json : p2Json,
+                    hand: this.#roundWinner.hand
+                }
+
+                return {
+                    firstP: fPJson,
+                    secondP: sPJson,
+                    deck: this.#deck.toJSON(),
+                    player1: p1Json,
+                    player2: p2Json,
+                    dealer: dealerJson,
+                    phase: this.#phase,
+                    pot: this.#pot,
+                    lastBet: this.#lastBet,
+                    lastBetter: lastBetterJson,
+                    ante: this.#ante,
+                    winner: winnerJson,
+                    roundWinner: roundWinnerJson
+                }
+            }
+
+            constructor(firstP = "", secondP = "", deck = new Deck(), player1 = new Player("{{user}}", 100), player2 = new Player("{{char}}", 100), dealer = "", phase = -1, pot = 0, lastBet = 0, lastBetter = "", ante = 10, winner = {}, roundWinner = {}) {
+                if (firstP === "") {
+                    this.#deck = new Deck()
+                    this.#deck.shuffle()
+                    this.#player1 = new Player("{{user}}", 100)
+                    this.#player2 = new Player("{{char}}", 100)
+                    this.#dealer = this.#player2
+                    this.#phase = -1
+                    this.#pot = 0
+                    this.#lastBet = 0
+                    this.#ante = 10
+                    this.#roundWinner = {}
+                    this.#winner = {}
+                }
+                else {
+                    this.#firstP = firstP
+                    this.#secondP = secondP
+                    this.#deck = deck
+                    this.#player1 = player1
+                    this.#player2 = player2
+                    this.#dealer = dealer
+                    this.#phase = phase
+                    this.#pot = pot
+                    this.#lastBet = lastBet
+                    this.#lastBetter = lastBetter
+                    this.#ante = ante
+                    this.#winner = winner
+                    this.#roundWinner = roundWinner
+                }
             }
 
             get pot() {
@@ -280,7 +366,7 @@
             }
 
             get winner() {
-                return this.#winner !== undefined ? this.#winner : ""
+                return this.#winner
             }
 
             get ante() {
@@ -497,10 +583,24 @@
             #name
             #hand
             #wager
-            constructor(name, wager) {
+
+            static fromJSON(json) {
+                const data = JSON.parse(json)
+                return new Player(data.name, data.wager, data.hand)
+            }
+
+            toJSON() {
+                return {
+                    name: this.#name,
+                    wager: this.#wager,
+                    hand: this.#hand
+                }
+            }
+
+            constructor(name, wager, hand = []) {
                 this.#name = name
-                this.#hand = []
                 this.#wager = wager
+                this.#hand = hand
             }
 
             addCardToHand(card) {
@@ -704,6 +804,8 @@
         const aiCards = document.getElementById("aiCards")
         const exchangeBtn = document.getElementById("exchangeBtn")
         const output = document.getElementById("output")
+        const saveBtn = document.getElementById("save")
+        const loadBtn = document.getElementById("load")
 
         const poker = new Poker()
         const p1 = poker.player1
@@ -719,7 +821,7 @@
 
         function nextPokerPhase() {
             poker.nextPhase()
-            if (poker.winner != "") {
+            if (Object.keys(poker.winner).length != 0) {
                 gameOver = true
                 output.innerHTML = `Game over. ${poker.winner.name} wins.`
                 return
@@ -772,7 +874,11 @@
 
 
         function updateStats() {
-            output.innerHTML = `Pot: $${poker.pot}<br>Last bet: $${poker.lastBet}<br>Bank: $${poker.player1.wager}`
+            let toAppend = ""
+            if(poker.phase === Poker.PHASE.EXCHANGE) {
+                toAppend = "<br>Select cards you want to exchange."
+            }
+            output.innerHTML = `Pot: $${poker.pot}<br>Last bet: $${poker.lastBet}<br>Bank: $${poker.player1.wager}${toAppend}`
         }
 
 
@@ -939,6 +1045,9 @@
             nextPokerPhase()
             proceedBtn.addEventListener("click", nextPokerPhase)
             exchangeBtn.addEventListener("click", exchangeCards)
+            saveBtn.addEventListener("click", function() {
+                console.log(JSON.stringify(poker.toJSON()))
+            })
 
             p1Call.addEventListener("click", function () {
                 let callVal = Math.min(p1.wager, poker.lastBet)
