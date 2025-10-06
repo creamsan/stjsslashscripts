@@ -134,6 +134,27 @@
             font-weight: bold;
             font-size: 1.3em;
         }
+
+        input[type="text"] {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            width: 250px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        input[type="text"]::placeholder {
+            color: #888;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            background-color: #2e2e2e;
+            color: #ffffff;
+        }
     </style>
 </head>
 
@@ -264,7 +285,7 @@
             #roundWinner
 
             static fromJSON(json) {
-                const data = JSON.parse(json)
+                const data = json
                 const deck = Deck.fromJSON(JSON.stringify(data.deck))
                 const p1 = Player.fromJSON(JSON.stringify(data.player1))
                 const p2 = Player.fromJSON(JSON.stringify(data.player2))
@@ -277,7 +298,7 @@
                     secondP: this.#secondP === "" ? "" : this.#secondP === this.#player2 ? "{{char}}" : "{{user}}",
                     deck: this.#deck.toJSON(),
                     player1: this.#player1.toJSON(),
-                    player2: his.#player2.toJSON(),
+                    player2: this.#player2.toJSON(),
                     dealer: this.#dealer === "" ? "" : this.#dealer === this.#player1 ? "{{user}}" : "{{char}}",
                     phase: this.#phase,
                     pot: this.#pot,
@@ -356,6 +377,7 @@
 
                 switch (this.#phase) {
                     case Poker.PHASE.ASSIGN_DEALER:
+                        this.#deck.shuffle()
                         this.#roundWinner = ""
                         this.#player1.emptyHand()
                         this.player2.emptyHand()
@@ -406,7 +428,6 @@
 
                         this.#pot = 0
                         this.#deck.resetCards()
-                        this.#deck.shuffle()
                         if (this.#player1.bank <= 0) {
                             this.#winner = this.#player2
                         }
@@ -546,7 +567,8 @@
                 return {
                     name: this.#name,
                     bank: this.#bank,
-                    hand: this.#hand
+                    hand: this.#hand,
+                    clothes: this.#clothes
                 }
             }
 
@@ -613,10 +635,11 @@
         let chatMessages
         let input
         async function loadAIReply() {
-            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-            input = newGenSwipes[newGenSwipes.length - 1]
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            input = chatMessages.swipes[chatMessages.swipes.length - 1]
             const regexInput = /<move>[\S\s]+?<\/move>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+
         }
 
 
@@ -625,33 +648,35 @@
         let swiped
         let toCut
         let userMesEdited
-        let aiMesEdited
-        let expectingOutput
+        //let expectingOutput
         let chatData
         function loadChatData() {
-            if (chatData === undefined) {
+            //chatData = JSON.parse(getVariables().chatData)
+            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+            if (chatData == null) {
                 triggerSlash(`/setvar key=chatData {}`)
+                chatData = {}
                 toJB = ""
                 gameOver = false
                 swiped = false
                 toCut = true
-                expectingOutput = false
+                //expectingOutput = false
                 userMesEdited = false
-                aiMesEdited = false
                 poker = new Poker()
                 p1 = poker.player1
                 p2 = poker.player2
+                nextPokerPhase()
             }
             else {
-                chatData = JSON.parse(getVariables().chatData)
                 toJB = chatData.toJB
                 gameOver = chatData.gameOver
                 swiped = chatData.swiped
                 toCut = chatData.toCut
-                expectingOutput = chatData.expectingOutput
+                //expectingOutput = chatData.expectingOutput
                 userMesEdited = chatData.userMesEdited
-                aiMesEdited = chatData.aiMesEdited
                 poker = Poker.fromJSON(chatData.pokerData)
+                p1 = poker.player1
+                p2 = poker.player2
             }
         }
 
@@ -660,8 +685,9 @@
             chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.toCut = toCut
-            chatData.expectingOutput = expectingOutput
+            //chatData.expectingOutput = expectingOutput
             chatData.userMesEdited = userMesEdited
+            chatData.toJB = toJB
             chatData.pokerData = poker.toJSON()
             triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
@@ -674,22 +700,24 @@
                 return false
             }
 
-            if (input == "") {
+            const mesId = chatMessages.message_id
+
+            if (mesId != 0 && input == "") {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 return false
             }
 
             for (const element of toVerify) {
-                if (element == "" && verifyMove(element) && expectingOutput) {
+                if (mesId != 0 && (element == "" || verifyMove(element))) {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
                 }
             }
-            expectingOutput = false
+            //expectingOutput = false
 
-            if (newGenSwipes.message_id === 0 || expectingOutput === false) {
+            if (mesId === 0) {
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -702,7 +730,7 @@
         const regexRaise = /raise:\s*\$?d+/i
         const regexDiscard = /discard:(\s*[2-9tajkq][schd],?){0,5}/i
         function verifyMove(aiInput) {
-            return regexCaChFo.test(aiInput) || regexRaise.test(aiInput) || regexDiscard.test(aiInput)
+            return (regexCaChFo.test(aiInput) || regexRaise.test(aiInput) || regexDiscard.test(aiInput)) === false
         }
 
 
@@ -714,7 +742,7 @@
                 saveData()
             })
             if (swiped) {
-                newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
+                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
                 const swipeGen = newGenSwipes[newGenSwipes.length - 1]
                 if (swipeGen === "...") {
                     saveData()
@@ -785,7 +813,13 @@
                     nextPokerPhase()
                     break
                 case Poker.PHASE.PLACE_ANTE:
+                    showAICards([])
+                    showCardsToExchange([])
+                    nextPokerPhase()
+                    break
                 case Poker.PHASE.DEAL_CARDS:
+                    showAICards(["NA", "NA", "NA", "NA", "NA"])
+                    showCardsToExchange(p1.hand)
                     nextPokerPhase()
                     break
                 case Poker.PHASE.PRE_EXCHANGE_BETS:
@@ -1022,6 +1056,11 @@ Raise: 10
             showCardsToExchange(p1.hand)
             exchangeBtn.style.visibility = "hidden"
             nextPokerPhase()
+            const a = "{{"
+            const b = "input"
+            const c = "}}"
+            triggerSlash(`/send ${a + b + c} |
+                /setinput {{noop}}`)
         }
 
 
@@ -1031,7 +1070,7 @@ Raise: 10
                 raiseVal = Math.min(p2.bank, raiseVal)
                 poker.playerMove(p2, Poker.MOVES.RAISE, raiseVal)
                 hideMoveBtns()
-                if(poker.lastBet >= p1.bank) {
+                if (poker.lastBet >= p1.bank) {
                     showAvailableBtns(["Call", "Fold"], p1BtnsArr)
                 }
                 else {
@@ -1064,6 +1103,8 @@ Raise: 10
                 hideMoveBtns()
                 updateStats()
             }
+            showAICards(["NA", "NA", "NA", "NA", "NA"])
+            showCardsToExchange(p1.hand)
         }
 
 
@@ -1071,12 +1112,12 @@ Raise: 10
         document.addEventListener("DOMContentLoaded", async function () {
             //init
             initError()
+
             await loadAIReply()
-            loadChatData()
 
             //regexes here
-            const regexAIMove = /(?<=<move>)[\S\s]+?(?=\s<\/move>)/i
-            const aiMove = regexAIMove.test(input) ? input.match(regexAIMove) : ""
+            const regexAIMove = /(?<=<move>\s+)[\S\s]+?(?=\s+<\/move>)/i
+            const aiMove = regexAIMove.test(input) ? input.match(regexAIMove)[0] : ""
 
             const toVerify = [aiMove]
             if (verifyInputs(toVerify) === false) {
@@ -1084,14 +1125,11 @@ Raise: 10
                 return
             }
 
-            if (await handleSwipe()) return
-            // if(handleAIMesEdit()) return
-            // if(handleUserMesEdit()) return
+            loadChatData()
 
             //main func start here
             handleAIMove(aiMove)
 
-            //nextPokerPhase()
             exchangeBtn.addEventListener("click", exchangeCards)
             p1Call.addEventListener("click", function () {
                 let callVal = Math.min(p1.bank, poker.lastBet)
@@ -1099,6 +1137,11 @@ Raise: 10
                 hideMoveBtns()
                 nextPokerPhase()
                 //tell ai: which cards to discard
+                const a = "{{"
+                const b = "input"
+                const c = "}}"
+                triggerSlash(`/send ${a + b + c} |
+                /setinput {{noop}}`)
                 toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
 - You now have a chance to improve your hand. Please add the following to the end of your response:
 <move>
@@ -1120,6 +1163,11 @@ Discard:
                 if (poker.lastBetter === p1) {
                     //tell ai: which cards to discard????
                     nextPokerPhase()
+                    const a = "{{"
+                    const b = "input"
+                    const c = "}}"
+                    triggerSlash(`/send ${a + b + c} |
+                /setinput {{noop}}`)
                     toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
 - You now have a chance to improve your hand. Please add the following to the end of your response:
 <move>
@@ -1138,6 +1186,11 @@ Discard:
                 else {
                     //showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
                     //tell ai to: check, raise, fold
+                    const a = "{{"
+                    const b = "input"
+                    const c = "}}"
+                    triggerSlash(`/send ${a + b + c} |
+                /setinput {{noop}}`)
                     toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
 - Your choices are to check or raise.
 - To make your choice, please include the following at the end of your response:
@@ -1164,6 +1217,11 @@ Raise: 10
                 hideMoveBtns()
                 //showAvailableBtns(MOVES_AFTER_RAISE, p2BtnsArr)
                 //tell ai to: call, raise, fold
+                const a = "{{"
+                const b = "input"
+                const c = "}}"
+                triggerSlash(`/send ${a + b + c} |
+                /setinput {{noop}}`)
                 toJB += `- {{user}} raised ${poker.lastBet}
 - Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
 - Your choices are to call, raise or fold.
@@ -1192,11 +1250,17 @@ Raise: 10
                 hideMoveBtns()
                 updateStats()
                 //tell ai: it won after user folding
+                const a = "{{"
+                const b = "input"
+                const c = "}}"
+                triggerSlash(`/send ${a + b + c} |
+                /setinput {{noop}}`)
                 toJB += `- {{user}} folds. You win.
                 `
             })
 
             // await updateJB()
+            console.log(poker)
             saveData()
         })
     </script>
