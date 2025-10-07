@@ -298,7 +298,7 @@
                 return
             }
             if (inPhone) {
-                if(phoneCooldown <= 0) {
+                if (phoneCooldown <= 0) {
                     inPhone = false
                     triggerSlash(`/comment ${savedBeforePhone}`)
                 }
@@ -309,7 +309,7 @@
                     return
                 }
             }
-            if(newGenSwipes["message_id"] === 0 || questionExpected === false) {
+            if (newGenSwipes["message_id"] === 0 || questionExpected === false) {
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -521,7 +521,8 @@
                 const a = "{{"
                 const b = "input"
                 const c = "}}"
-                triggerSlash(`/send ${a+b+c} |
+                triggerSlash(`/send ${a + b + c}
+... |
                 /setinput {{noop}} |
                 /trigger`)
 

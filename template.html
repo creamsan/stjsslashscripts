@@ -68,7 +68,7 @@
             <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
         <div id="error_msg">
-            The AI did not produce the expected output. Please swipe or regenerate. If this is the first message, you
+            The AI did not produce the expected output. Please swipe or regenerate. If this is the intro, you
             should ignore this.
         </div>
         <button class="stylized-button" id="ignore_btn">Ignore</button>
@@ -107,13 +107,14 @@
         let swiped
         let toCut
         let userMesEdited
+        let aiMesEdited
         let expectingOutput
         let chatData
         //ai side
-        function loadChatData() {
+        async function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
             if (chatData == null) {
-                triggerSlash(`/setvar key=chatData {}`)
+                await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
                 toJB = ""
                 gameOver = false
@@ -121,6 +122,7 @@
                 toCut = true
                 expectingOutput = false
                 userMesEdited = false
+                aiMesEdited = false
             }
             else {
                 toJB = chatData.toJB
@@ -129,8 +131,10 @@
                 toCut = chatData.toCut
                 expectingOutput = chatData.expectingOutput
                 userMesEdited = false
+                aiMesEdited = chatData.aiMesEdited
             }
         }
+
         //user side
         function loadChatData() {
             toJB = chatData.toJB
@@ -139,16 +143,18 @@
             toCut = chatData.toCut
             expectingOutput = chatData.expectingOutput
             userMesEdited = chatData.userMesEdited
+            aiMesEdited = false
         }
 
-        function saveData() {
+        async function saveData() {
             chatData.toJB = toJB
             chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.toCut = toCut
             chatData.expectingOutput = expectingOutput
             chatData.userMesEdited = userMesEdited
-            triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            chatData.aiMesEdited = aiMesEdited
+            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
 
@@ -168,7 +174,7 @@
             }
 
             for (const element of toVerify) {
-                if (element == "" && verifyMove(element) && expectingOutput) {
+                if (element == "" || wrongFormat(element)) {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
@@ -176,7 +182,7 @@
             }
             expectingOutput = false
 
-            if (mesId === 0 || expectingOutput === false) {
+            if (mesId === 0) {
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -185,7 +191,7 @@
         }
 
 
-        function verifyMove(aiInput) {
+        function wrongFormat(aiInput) {
             //extra verifaction
 
         }
@@ -193,16 +199,16 @@
 
         //ai side
         async function handleSwipe() {
-            eventOnce(tavern_events.MESSAGE_SWIPED, function () {
+            eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
                 //change some data and save everything before swipe
                 swiped = true
-                saveData()
+                await saveData()
             })
             if (swiped) {
                 const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
                 const swipeGen = newGenSwipes[newGenSwipes.length - 1]
                 if (swipeGen === "...") {
-                    saveData()
+                    await saveData()
                     return true
                 }
                 input = swipeGen
@@ -213,14 +219,25 @@
 
 
         //user side
-        function handleUserMesEdit() {
+        async function handleUserMesEdit() {
             if (userMesEdited) {
                 main_cont.parentNode.removeChild(main_cont)
-                saveData()
+                await saveData()
                 return true
             }
             userMesEdited = true
             swiped = false
+            return false
+        }
+
+
+        //ai side
+        async function handleAIMesEdit() {
+            if (aiMesEdited) {
+                await saveData()
+                return true
+            }
+            aiMesEdited = true
             return false
         }
 
@@ -252,8 +269,8 @@ ${origInput}
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             initError()
-            
             await loadAIReply()
+            await loadChatData()
 
             //intro handler - for multi intro cards
             if (chatMessages.message_id === 0) {
@@ -266,23 +283,24 @@ ${origInput}
 
             const toVerify = []
             if (verifyInputs(toVerify) === false) {
-                saveData()
+                await saveData()
                 return
             }
-
-            loadChatData()
 
             if (await handleSwipe()) return
 
             //user
-            if(handleUserMesEdit()) return
+            if (await handleUserMesEdit()) return
 
             //main func start here
 
             //user
             await updateJB()
-            
-            saveData()
+
+            //ai
+            if (await handleAIMesEdit()) return
+
+            await saveData()
         })
     </script>
 </body>

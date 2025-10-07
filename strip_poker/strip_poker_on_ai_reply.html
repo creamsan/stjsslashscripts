@@ -155,6 +155,11 @@
             background-color: #2e2e2e;
             color: #ffffff;
         }
+
+        #continueBtn {
+            visibility: hidden;
+            background-color: rgb(22, 152, 203);
+        }
     </style>
 </head>
 
@@ -164,7 +169,7 @@
             <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
         <div id="error_msg">
-            The AI did not produce the expected output. Please swipe or regenerate. If this is the first message, you
+            The AI did not produce the expected output. Please swipe or regenerate. If this is the intro, you
             should ignore this.
         </div>
         <button class="stylized-button" id="ignore_btn">Ignore</button>
@@ -179,16 +184,20 @@
                         id="p1MaxRaise"></span></div>
                 <div><button class="move stylized-button" id="p1Fold">Fold</button></div>
             </div>
-            <div id="output">Ouput ghere</div>
+            <div id="output">It's a bug. Check the console.</div>
+            <button class="stylized-button" id="continueBtn">Continue <i class="fa-solid fa-paper-plane"></i></button>
         </div>
         <div id="exchange">
             <div id="aiCards"></div>
             <div id="cards"></div>
-            <button id="exchangeBtn" class="stylized-button">Exchange</button>
+            <button id="exchangeBtn" class="stylized-button">Exchange <i class="fa-solid fa-paper-plane"></i></button>
         </div>
     </div>
 
     <script>
+        const INITIAL_BANK = 100
+        const ANTE = 10
+
         class Deck {
             static allCards = [
                 'AS', '2S', '3S', '4S', '5S', '6S', '7S', '8S', '9S', 'TS', 'JS', 'QS', 'KS',
@@ -295,7 +304,7 @@
             toJSON() {
                 return {
                     firstP: this.#firstP === "" ? "" : this.#firstP === this.#player1 ? "{{user}}" : "{{char}}",
-                    secondP: this.#secondP === "" ? "" : this.#secondP === this.#player2 ? "{{char}}" : "{{user}}",
+                    secondP: this.#secondP === "" ? "" : this.#secondP === this.#player1 ? "{{user}}" : "{{char}}",
                     deck: this.#deck.toJSON(),
                     player1: this.#player1.toJSON(),
                     player2: this.#player2.toJSON(),
@@ -313,7 +322,7 @@
                 }
             }
 
-            constructor(firstP = "", secondP = "", deck = new Deck(), player1 = new Player("{{user}}", 100), player2 = new Player("{{char}}", 100), dealer = "", phase = -1, pot = 0, lastBet = 0, lastBetter = "", ante = 10, winner = "", roundWinner = "") {
+            constructor(firstP = "", secondP = "", deck = new Deck(), player1 = new Player("{{user}}", INITIAL_BANK), player2 = new Player("{{char}}", INITIAL_BANK), dealer = "", phase = -1, pot = 0, lastBet = 0, lastBetter = "", ante = ANTE, winner = "", roundWinner = "") {
                 this.#player1 = player1
                 this.#player2 = player2
                 this.#firstP = firstP === "" ? "" : firstP === "{{user}}" ? this.#player1 : this.#player2
@@ -377,6 +386,7 @@
 
                 switch (this.#phase) {
                     case Poker.PHASE.ASSIGN_DEALER:
+                        this.#deck.resetCards()
                         this.#deck.shuffle()
                         this.#roundWinner = ""
                         this.#player1.emptyHand()
@@ -423,11 +433,32 @@
                             }
                             this.#secondP.earn(this.#pot)
                         } else {
-                            this.compareHighCards(this.#firstP.hand, this.#secondP.hand, this.descriptiveHand(firstPHand), this.descriptiveHand(secondPHand));
+                            let tieWin = this.getTiedHandWinner(this.#firstP.hand, this.#secondP.hand, firstPHand)
+                            if (tieWin === 1) {
+                                this.#roundWinner = {
+                                    player: this.#firstP,
+                                    hand: this.descriptiveHand(firstPHand)
+                                }
+                                this.#firstP.earn(this.#pot)
+                            }
+                            else if (tieWin === 2) {
+                                this.#roundWinner = {
+                                    player: this.#secondP,
+                                    hand: this.descriptiveHand(secondPHand)
+                                }
+                                this.#secondP.earn(this.#pot)
+                            }
+                            else {
+                                this.#roundWinner = {
+                                    player: "",
+                                    hand: "Tie"
+                                }
+                                this.#firstP.earn(this.#pot / 2)
+                                this.#secondP.earn(this.#pot)
+                            }
                         }
 
                         this.#pot = 0
-                        this.#deck.resetCards()
                         if (this.#player1.bank <= 0) {
                             this.#winner = this.#player2
                         }
@@ -463,7 +494,7 @@
                         this.#lastBetter = player
                         break
                     case Poker.MOVES.FOLD:
-                        let winner = player === this.player1 ? this.player1 : this.player2
+                        let winner = player === this.player1 ? this.player2 : this.player1
                         winner.earn(this.#pot)
                         this.#pot = 0
                         this.#phase = Poker.PHASE.SHOWDOWN
@@ -475,35 +506,146 @@
                 }
             }
 
-            compareHighCards(hand1, hand2, hand1Desc, hand2Desc) {
-                const valueOrder = "23456789TJQKA";
 
-                const hand1Values = hand1.map(card => card[0]).sort((a, b) => valueOrder.indexOf(b) - valueOrder.indexOf(a));
-                const hand2Values = hand2.map(card => card[0]).sort((a, b) => valueOrder.indexOf(b) - valueOrder.indexOf(a));
+            getTiedHandWinner(hand1, hand2, handType) {
+                // hand1 and hand2 are arrays of card objects: [{rank: '10', suit: 'hearts'}, ...]
+                // handType is a string: 'pair', 'two-pair', 'three-of-a-kind', 'straight', 'flush', 'full-house', 'four-of-a-kind', 'straight-flush'
 
-                for (let i = 0; i < hand1Values.length; i++) {
-                    const hand1ValueIndex = valueOrder.indexOf(hand1Values[i]);
-                    const hand2ValueIndex = valueOrder.indexOf(hand2Values[i]);
-
-                    if (hand1ValueIndex > hand2ValueIndex) {
-                        this.#roundWinner = {
-                            player: this.#firstP,
-                            hand: hand1Desc
-                        }
-                        this.#firstP.earn(this.#pot)
-                        return
-                    } else if (hand1ValueIndex < hand2ValueIndex) {
-                        this.#roundWinner = {
-                            player: this.#secondP,
-                            hand: hand2Desc
-                        }
-                        this.#secondP.earn(this.#pot)
-                        return
+                let h1 = hand1.map(card => {
+                    let firstChar = card.match(/^./i)[0]
+                    return {
+                        rank: firstChar
                     }
+                })
+                let h2 = hand2.map(card => {
+                    let firstChar = card.match(/^./i)[0]
+                    return {
+                        rank: firstChar
+                    }
+                })
+
+                const rankValues = {
+                    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+                    'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
+                };
+
+                const getRankValue = (rank) => rankValues[rank];
+
+                const getRankCounts = (hand) => {
+                    const counts = {};
+                    hand.forEach(card => {
+                        counts[card.rank] = (counts[card.rank] || 0) + 1;
+                    });
+                    return counts;
+                };
+
+                const getSortedRanks = (hand, counts) => {
+                    // Sort by count (descending), then by rank value (descending)
+                    return Object.keys(counts).sort((a, b) => {
+                        if (counts[b] !== counts[a]) return counts[b] - counts[a];
+                        return getRankValue(b) - getRankValue(a);
+                    }).map(getRankValue);
+                };
+
+                const getKickers = (hand, excludeRanks) => {
+                    return hand
+                        .map(card => getRankValue(card.rank))
+                        .filter(rank => !excludeRanks.includes(rank))
+                        .sort((a, b) => b - a);
+                };
+
+                switch (handType) {
+                    case Poker.HANDS.ONE_PAIR:
+                    case Poker.HANDS.THREE_OF_A_KIND:
+                    case Poker.HANDS.FOUR_OF_A_KIND: {
+                        const counts1 = getRankCounts(h1);
+                        const counts2 = getRankCounts(h2);
+                        const sorted1 = getSortedRanks(h1, counts1);
+                        const sorted2 = getSortedRanks(h2, counts2);
+
+                        // Compare the main rank (pair/three/four)
+                        if (sorted1[0] > sorted2[0]) return 1;
+                        if (sorted1[0] < sorted2[0]) return 2;
+
+                        // Compare kickers
+                        for (let i = 1; i < sorted1.length; i++) {
+                            if (sorted1[i] > sorted2[i]) return 1;
+                            if (sorted1[i] < sorted2[i]) return 2;
+                        }
+                        return 0; // tie
+                    }
+
+                    case Poker.HANDS.TWO_PAIR: {
+                        const counts1 = getRankCounts(h1);
+                        const counts2 = getRankCounts(h2);
+                        const sorted1 = getSortedRanks(h1, counts1);
+                        const sorted2 = getSortedRanks(h2, counts2);
+
+                        // Compare high pair
+                        if (sorted1[0] > sorted2[0]) return 1;
+                        if (sorted1[0] < sorted2[0]) return 2;
+
+                        // Compare low pair
+                        if (sorted1[1] > sorted2[1]) return 1;
+                        if (sorted1[1] < sorted2[1]) return 2;
+
+                        // Compare kicker
+                        if (sorted1[2] > sorted2[2]) return 1;
+                        if (sorted1[2] < sorted2[2]) return 2;
+
+                        return 0; // tie
+                    }
+
+                    case Poker.HANDS.FULL_HOUSE: {
+                        const counts1 = getRankCounts(h1);
+                        const counts2 = getRankCounts(h2);
+                        const sorted1 = getSortedRanks(h1, counts1);
+                        const sorted2 = getSortedRanks(h2, counts2);
+
+                        // Compare three-of-a-kind first
+                        if (sorted1[0] > sorted2[0]) return 1;
+                        if (sorted1[0] < sorted2[0]) return 2;
+
+                        // Compare pair
+                        if (sorted1[1] > sorted2[1]) return 1;
+                        if (sorted1[1] < sorted2[1]) return 2;
+
+                        return 0; // tie
+                    }
+
+                    case Poker.HANDS.STRAIGHT:
+                    case Poker.HANDS.STRAIGHT_FLUSH: {
+                        const ranks1 = h1.map(card => getRankValue(card.rank)).sort((a, b) => b - a);
+                        const ranks2 = h2.map(card => getRankValue(card.rank)).sort((a, b) => b - a);
+
+                        // Check for A-2-3-4-5 (wheel/5-high straight)
+                        const isWheel1 = ranks1[0] === 14 && ranks1[1] === 5;
+                        const isWheel2 = ranks2[0] === 14 && ranks2[1] === 5;
+
+                        const high1 = isWheel1 ? 5 : ranks1[0];
+                        const high2 = isWheel2 ? 5 : ranks2[0];
+
+                        if (high1 > high2) return 1;
+                        if (high1 < high2) return 2;
+                        return 0; // tie
+                    }
+
+                    case Poker.HANDS.FLUSH:
+                    case Poker.HANDS.HIGH_CARD: {
+                        const ranks1 = h1.map(card => getRankValue(card.rank)).sort((a, b) => b - a);
+                        const ranks2 = h2.map(card => getRankValue(card.rank)).sort((a, b) => b - a);
+
+                        // Compare each card from highest to lowest
+                        for (let i = 0; i < ranks1.length; i++) {
+                            if (ranks1[i] > ranks2[i]) return 1;
+                            if (ranks1[i] < ranks2[i]) return 2;
+                        }
+                        return 0; // tie
+                    }
+
+                    default:
+                        throw new Error(`Unknown hand type: ${handType}`);
                 }
-                //tie
-                this.#firstP.earn(this.#pot / 2)
-                this.#secondP.earn(this.#pot / 2)
             }
 
             evaluateHand(cards) {
@@ -560,7 +702,7 @@
 
             static fromJSON(json) {
                 const data = JSON.parse(json)
-                return new Player(data.name, data.bank, data.hand)
+                return new Player(data.name, data.bank, data.clothes, data.hand)
             }
 
             toJSON() {
@@ -572,13 +714,15 @@
                 }
             }
 
-            constructor(name, bank, hand = []) {
+            constructor(name, bank, clothes = {}, hand = []) {
                 this.#name = name
                 this.#bank = bank
                 this.#hand = hand
+                this.#clothes = clothes
             }
 
             addCardToHand(card) {
+                if(this.#hand.length === 5) return
                 this.#hand.push(card)
             }
 
@@ -586,8 +730,8 @@
                 this.#bank += amount
             }
 
-            discard(card) {
-                this.#hand = this.#hand.filter(c => c !== card)
+            discard(cards) {
+                this.#hand = this.#hand.filter(c => !cards.includes(c))
             }
 
             bet(amount) {
@@ -600,6 +744,10 @@
 
             get clothes() {
                 return this.#clothes
+            }
+
+            set clothes(clothes) {
+                this.#clothes = clothes
             }
 
             get name() {
@@ -639,7 +787,6 @@
             input = chatMessages.swipes[chatMessages.swipes.length - 1]
             const regexInput = /<move>[\S\s]+?<\/move>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
-
         }
 
 
@@ -648,20 +795,24 @@
         let swiped
         let toCut
         let userMesEdited
-        //let expectingOutput
+        let aiMesEdited
         let chatData
-        function loadChatData() {
-            //chatData = JSON.parse(getVariables().chatData)
+        let cooldown
+        let expectingOutput
+        let pause = false
+        async function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
             if (chatData == null) {
-                triggerSlash(`/setvar key=chatData {}`)
+                await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
                 toJB = ""
                 gameOver = false
                 swiped = false
                 toCut = true
-                //expectingOutput = false
+                aiMesEdited = false
                 userMesEdited = false
+                cooldown = 0
+                expectingOutput = false
                 poker = new Poker()
                 p1 = poker.player1
                 p2 = poker.player2
@@ -672,8 +823,10 @@
                 gameOver = chatData.gameOver
                 swiped = chatData.swiped
                 toCut = chatData.toCut
-                //expectingOutput = chatData.expectingOutput
-                userMesEdited = chatData.userMesEdited
+                expectingOutput = chatData.expectingOutput
+                aiMesEdited = chatData.aiMesEdited
+                userMesEdited = false
+                cooldown = chatData.cooldown
                 poker = Poker.fromJSON(chatData.pokerData)
                 p1 = poker.player1
                 p2 = poker.player2
@@ -681,43 +834,79 @@
         }
 
 
-        function saveData() {
+        async function saveData() {
             chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.toCut = toCut
-            //chatData.expectingOutput = expectingOutput
+            chatData.aiMesEdited = aiMesEdited
             chatData.userMesEdited = userMesEdited
             chatData.toJB = toJB
+            chatData.expectingOutput = expectingOutput
+            chatData.cooldown = cooldown
             chatData.pokerData = poker.toJSON()
-            triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+        }
+
+
+        function verifyClothes() {
+            const regexUserClothes = /(?<=<clothes>\s*{{user}}:\s+)[\S\s]+?(?=\s+Opponent)/i
+            const regexCharClothes = /(?<=<clothes>[\S\s]+Opponent:\s+)[\S\s]+?(?=\s+<\/clothes>)/i
+            const firstMes = chatMessages.swipes[chatMessages.swipes.length - 1]
+
+            if (regexUserClothes.test(firstMes) && regexCharClothes.test(firstMes)) {
+                let clothesObj = {}
+                let p1clothes = JSON.parse(firstMes.match(regexUserClothes)[0])
+                let increment = INITIAL_BANK / p1clothes.length
+                p1clothes.forEach((clothing, i) => {
+                    clothesObj[clothing] = i * increment
+                });
+                p1.clothes = clothesObj
+
+                clothesObj = {}
+                let p2clothes = JSON.parse(firstMes.match(regexCharClothes)[0])
+                increment = INITIAL_BANK / p2clothes.length
+                p2clothes.forEach((clothing, i) => {
+                    clothesObj[clothing] = i * increment
+                })
+                p2.clothes = clothesObj
+
+                return true
+            }
+            else {
+                toastr.error("Wrong clothes format in the intro.")
+                return false
+            }
         }
 
 
         //ai side
         function verifyInputs(toVerify) {
+            const mesId = chatMessages.message_id
+
+            if (mesId === 0 && verifyClothes() === false) {
+                return false
+            }
+
             if (gameOver) {
                 main_cont.parentNode.removeChild(main_cont)
                 return false
             }
 
-            const mesId = chatMessages.message_id
-
-            if (mesId != 0 && input == "") {
+            if (mesId != 0 && input == "" && expectingOutput) {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 return false
             }
 
             for (const element of toVerify) {
-                if (mesId != 0 && (element == "" || verifyMove(element))) {
+                if (mesId != 0 && (element == "" || correctFormat(element) === false) && expectingOutput) {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
                 }
             }
-            //expectingOutput = false
 
-            if (mesId === 0) {
+            if (mesId === 0 || expectingOutput === false) {
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -726,51 +915,21 @@
         }
 
 
-        const regexCaChFo = /call|check|fold/i
-        const regexRaise = /raise:\s*\$?d+/i
+        const regexBet = /bet:\s*\$?\d+/i
         const regexDiscard = /discard:(\s*[2-9tajkq][schd],?){0,5}/i
-        function verifyMove(aiInput) {
-            return (regexCaChFo.test(aiInput) || regexRaise.test(aiInput) || regexDiscard.test(aiInput)) === false
+        function correctFormat(aiInput) {
+            return regexBet.test(aiInput) || regexDiscard.test(aiInput)
         }
 
 
         //ai side
-        async function handleSwipe() {
-            eventOnce(tavern_events.MESSAGE_SWIPED, function () {
-                //change some data and save everything before swipe
-                swiped = true
-                saveData()
-            })
-            if (swiped) {
-                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-                const swipeGen = newGenSwipes[newGenSwipes.length - 1]
-                if (swipeGen === "...") {
-                    saveData()
-                    return true
-                }
-                input = swipeGen
-                swiped = false
+        async function handleAIMesEdit() {
+            if (aiMesEdited) {
+                await saveData()
+                return true
             }
+            aiMesEdited = true
             return false
-        }
-
-
-        //user side
-        function handleUserMesEdit() {
-            if (userMesEdited) {
-                main_cont.parentNode.removeChild(main_cont)
-                saveData()
-                return
-            }
-            userMesEdited = true
-            swiped = false
-        }
-
-
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
         }
 
 
@@ -784,6 +943,7 @@
         const aiCards = document.getElementById("aiCards")
         const exchangeBtn = document.getElementById("exchangeBtn")
         const output = document.getElementById("output")
+        const continueBtn = document.getElementById("continueBtn")
 
         let poker
         let p1
@@ -795,16 +955,23 @@
         let p2ToExchange = []
 
 
-        function nextPokerPhase() {
-            poker.nextPhase()
+        function nextPokerPhase(next = true) {
+            if (next) poker.nextPhase()
             if (poker.winner != "") {
+                showCardsToExchange(p1.hand)
+                showAICards(p2.hand)
                 gameOver = true
-                output.innerHTML = `Game over. ${poker.winner.name} wins.`
-                toJB += `- The game is over.
+                output.innerText = "Game over."
+                continueBtn.style.visibility = "visible"
+                toJB += `- Last game showdown:
+- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
+- {{user}}'s hand: ${p1.hand} - ${poker.descriptiveHand(poker.evaluateHand(p1.hand))}
+- ${poker.roundWinner.player.name === "{{user}}" ? "You lost" : "You won"}
 `
+                continueBtn.style.visibility = "visible"
                 return
             }
-            hideMoveBtns()
+            //hideMoveBtns()
             switch (poker.phase) {
                 case Poker.PHASE.ASSIGN_DEALER:
                     showAICards([])
@@ -829,22 +996,7 @@
                     if (poker.dealer.name === "{{user}}") {
                         //showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
                         //tell ai to: check, raise, fold
-                        toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
-- Your choices are to check or raise.
-- To make your choice, please include the following at the end of your response:
-<move>
-[Your move here]
-</move>
-- If you choose to check, simply end with:
-<move>
-Check
-</move>
-- If you choose to raise, include your bet. Here's an example:
-<move>
-Raise: 10
-</move>
-- There's no limit to betting. However, it's limited to your current bank, which is only ${p2.bank}. Going all in means betting your entire bank.
-                        `
+                        aiMakeMove("first")
                     }
                     else {
                         showAvailableBtns(MOVES_AFTER_CHECK, p1BtnsArr)
@@ -852,21 +1004,6 @@ Raise: 10
                     updateStats()
                     break
                 case Poker.PHASE.EXCHANGE:
-                    //tell ai: its hand, which cards to discard
-                    toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
-- You now have a chance to improve your hand. Please add the following to the end of your response:
-<move>
-Discard: cards in your hand that you want replaced, separated by commas
-</move>
-- A card is represented by two characters. The first character represents the card's value. For example, ace is represented by A, king by K, 7 as 7, and 10 by T, and so on. The second character represents its suit: S - spade, H - heart, C - club, and D - diamond. Here's an example:
-<move>
-Discard: TS, AH, 7C, KD
-</move>
-- If you don't want to discard and happy with your hand, leave it blank.
-<move>
-Discard:
-</move>
-                `
                     exchangeBtn.style.visibility = "visible"
                     updateStats()
                     break
@@ -877,22 +1014,7 @@ Discard:
                     if (poker.dealer.name === "{{user}}") {
                         //showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
                         //tell ai to: check raise, fold
-                        toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
-- Your choices are to check or raise.
-- To make your choice, please include the following at the end of your response:
-<move>
-[Your move here]
-</move>
-- If you choose to check, simply end with:
-<move>
-Check
-</move>
-- If you choose to raise, include your bet. Here's an example:
-<move>
-Raise: 10
-</move>
-- There's no limit to betting. However, it's limited to your current bank, which is only ${p2.bank}. Going all in means betting your entire bank.
-                        `
+                        aiMakeMove("first")
                     }
                     else {
                         showAvailableBtns(MOVES_AFTER_CHECK, p1BtnsArr)
@@ -900,13 +1022,14 @@ Raise: 10
                     updateStats()
                     break
                 case Poker.PHASE.SHOWDOWN:
+                    continueBtn.style.visibility = "visible"
                     showAICards(p2.hand)
-                    output.innerHTML = `Winner: ${poker.roundWinner.player.name}<br>${poker.roundWinner.hand}`
-                    toJB += `- It's showdown
+                    updateStats()
+                    toJB += `- Last game showdown:
 - Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
 - {{user}}'s hand: ${p1.hand} - ${poker.descriptiveHand(poker.evaluateHand(p1.hand))}
-- ${poker.roundWinner.player.name === "{{user}}" ? "You lost this round" : "You won this round"}
-                    `
+- ${poker.roundWinner.player.name === "{{user}}" ? "You lost" : "You won"}
+`
             }
         }
 
@@ -914,7 +1037,10 @@ Raise: 10
         function updateStats() {
             let toAppend = ""
             if (poker.phase === Poker.PHASE.EXCHANGE) {
-                toAppend = "<br>Select cards you want to exchange."
+                toAppend = "<br>Select the cards you want to exchange."
+            }
+            else if (poker.phase === Poker.PHASE.SHOWDOWN) {
+                toAppend = `<br>${poker.roundWinner.player.name === "{{user}}" ? "You win" : "You lost"}<br>Winning hand: ${poker.roundWinner.hand}`
             }
             output.innerHTML = `Pot: $${poker.pot}<br>Last bet: $${poker.lastBet}<br>Bank: $${poker.player1.bank}${toAppend}`
         }
@@ -1033,78 +1159,99 @@ Raise: 10
         }
 
 
-        function exchangeCards() {
-            toJB += `- {{user}} exchanged ${p1ToExchange} cards.
+        function aiMakeMove(lastUserMove, userBet = 0) {
+            if (pause) return
+            const hand = poker.evaluateHand(poker.player2.hand)
+            switch (lastUserMove) {
+                case "first":
+                    if (maxBet > 0) {
+                        let raiseVal = maxBet
+                        raiseVal = Math.min(p2.bank, raiseVal)
+                        if (chatMessages.message_id != 0) toastr.info(`First -> Opponent raised the bet by ${raiseVal}`)
+                        poker.playerMove(p2, Poker.MOVES.RAISE, raiseVal)
+                        hideMoveBtns()
+                        showAvailableBtns(MOVES_AFTER_RAISE, p1BtnsArr)
+                        updateStats()
+                    }
+                    else {
+                        poker.playerMove(p2, Poker.MOVES.CHECK)
+                        hideMoveBtns()
+                        if (poker.lastBetter === p2) {
+                            nextPokerPhase()
+                        }
+                        else {
+                            if (chatMessages.message_id != 0) toastr.info("First -> Opponent checked")
+                            showAvailableBtns(MOVES_AFTER_CHECK, p1BtnsArr)
+                            updateStats()
+                        }
+                    }
+                    break
+                case "check":
+                    if (maxBet <= 0) {
+                        poker.playerMove(p2, Poker.MOVES.CHECK)
+                        hideMoveBtns()
+                        if (poker.lastBetter === p2) {
+                            nextPokerPhase()
+                        }
+                        else {
+                            toastr.info("Check -> Opponent checked")
+                            showAvailableBtns(MOVES_AFTER_CHECK, p1BtnsArr)
+                            updateStats()
+                        }
+                    }
+                    else {
+                        let raiseVal = maxBet
+                        raiseVal = Math.min(p2.bank, raiseVal)
+                        toastr.info(`Check -> Opponent raised the bet by ${raiseVal}`)
+                        poker.playerMove(p2, Poker.MOVES.RAISE, raiseVal)
+                        hideMoveBtns()
+                        showAvailableBtns(MOVES_AFTER_RAISE, p1BtnsArr)
+                        updateStats()
+                    }
+                    break
+                case "raise":
+                    let toBet = maxBet - userBet
+                    let toCall = "{{random:true, false}}" === "true" ? true : false
+                    if (toCall === false && (maxBet === 0 || toBet < 0)) {
+                        toastr.info("Raise -> Opponent folded")
+                        poker.playerMove(p2, Poker.MOVES.FOLD)
+                        hideMoveBtns()
+                        updateStats()
+                        continueBtn.style.visibility = "visible"
+                        toJB += `- You folded.
 `
-
-            //player
-            for (let i = 0; i < p1ToExchange.length; i++) {
-                const toDiscard = p1ToExchange[i]
-                p1.discard(toDiscard)
-                p1.addCardToHand(poker.deck.getCard())
+                    }
+                    else if (toBet <= 0 || maxBet === 0) {
+                        toastr.info("Raise -> Opponent called")
+                        let callVal = Math.min(p2.bank, poker.lastBet)
+                        poker.playerMove(p2, Poker.MOVES.CALL, callVal)
+                        hideMoveBtns()
+                        nextPokerPhase()
+                    }
+                    else {
+                        let raiseVal = Math.min(p2.bank, toBet)
+                        poker.playerMove(p2, Poker.MOVES.RAISE, raiseVal)
+                        toastr.info(`Raise -> Opponent raised the bet by ${raiseVal}`)
+                        hideMoveBtns()
+                        showAvailableBtns(MOVES_AFTER_RAISE, p1BtnsArr)
+                        updateStats()
+                    }
+                    maxBet = toBet
+                    break
             }
-            p1ToExchange = []
-
-            //ai
-            for (let i = 0; i < p2ToExchange.length; i++) {
-                const toDiscard = p2ToExchange[i]
-                p2.discard(toDiscard)
-                p2.addCardToHand(poker.deck.getCard())
-            }
-            p2ToExchange = []
-
-            showCardsToExchange(p1.hand)
-            exchangeBtn.style.visibility = "hidden"
-            nextPokerPhase()
-            const a = "{{"
-            const b = "input"
-            const c = "}}"
-            triggerSlash(`/send ${a + b + c} |
-                /setinput {{noop}}`)
         }
 
 
-        function handleAIMove(aiMove) {
-            if (regexRaise.test(aiMove)) {
-                let raiseVal = Number.parseInt(aiMove.match(/(?<=raise:\s\$?)\d+/i)[0]) + poker.lastBet
-                raiseVal = Math.min(p2.bank, raiseVal)
-                poker.playerMove(p2, Poker.MOVES.RAISE, raiseVal)
-                hideMoveBtns()
-                if (poker.lastBet >= p1.bank) {
-                    showAvailableBtns(["Call", "Fold"], p1BtnsArr)
-                }
-                else {
-                    showAvailableBtns(MOVES_AFTER_RAISE, p1BtnsArr)
-                }
-                updateStats()
+        let maxBet
+        function getAIMove(aiMove) {
+            let toOutput = ""
+            if (regexBet.test(aiMove)) {
+                maxBet = Number.parseInt(aiMove.match(/(?<=bet:\s\$?)\d+/i)[0])
+                maxBet = Math.min(p2.bank, maxBet)
             }
-            else if (regexDiscard.test(aiMove)) {
+            if (regexDiscard.test(aiMove)) {
                 p2ToExchange = Array.from(aiMove.matchAll(/\b[2-9ajqkt][schd]\b/gi), match => match[0])
             }
-            else if (/call/i.test(aiMove)) {
-                let callVal = Math.min(p2.bank, poker.lastBet)
-                poker.playerMove(p2, Poker.MOVES.CALL, callVal)
-                hideMoveBtns()
-                nextPokerPhase()
-            }
-            else if (/check/i.test(aiMove)) {
-                poker.playerMove(p2, Poker.MOVES.CHECK)
-                hideMoveBtns()
-                if (poker.lastBetter === p2) {
-                    nextPokerPhase()
-                }
-                else {
-                    showAvailableBtns(MOVES_AFTER_CHECK, p1BtnsArr)
-                    updateStats()
-                }
-            }
-            else if (/fold/i.test(aiMove)) {
-                poker.playerMove(p2, Poker.MOVES.FOLD)
-                hideMoveBtns()
-                updateStats()
-            }
-            showAICards(["NA", "NA", "NA", "NA", "NA"])
-            showCardsToExchange(p1.hand)
         }
 
 
@@ -1114,6 +1261,7 @@ Raise: 10
             initError()
 
             await loadAIReply()
+            await loadChatData()
 
             //regexes here
             const regexAIMove = /(?<=<move>\s+)[\S\s]+?(?=\s+<\/move>)/i
@@ -1121,41 +1269,74 @@ Raise: 10
 
             const toVerify = [aiMove]
             if (verifyInputs(toVerify) === false) {
-                saveData()
+                await saveData()
                 return
             }
 
-            loadChatData()
+            //buttons
+            exchangeBtn.addEventListener("click", async function () {
+                pause = true
+                //player
+                p1.discard(p1ToExchange)
+                for (let i = 0; i < p1ToExchange.length; i++) {
+                    p1.addCardToHand(poker.deck.getCard())
+                }
+                p1ToExchange = []
 
-            //main func start here
-            handleAIMove(aiMove)
+                //ai
+                p2.discard(p2ToExchange)
+                for (let i = 0; i < p2ToExchange.length; i++) {
+                    p2.addCardToHand(poker.deck.getCard())
+                }
+                p2ToExchange = []
 
-            exchangeBtn.addEventListener("click", exchangeCards)
+                showCardsToExchange(p1.hand)
+                exchangeBtn.style.visibility = "hidden"
+                continueBtn.style.visibility = "visible"
+                nextPokerPhase()
+                await saveData()
+                const a = "{{"
+                const b = "input"
+                const c = "}}"
+                await triggerSlash(`/send ${a + b + c}
+... |
+                /setinput {{noop}} | /trigger`)
+                main_cont.style.display = "none"
+            })
+            continueBtn.addEventListener("click", async function () {
+                Object.keys(p1.clothes).forEach(c => {
+                    if (p1.bank <= p1.clothes[c]) {
+                        toJB += `- After the last game, {{user}} must take off his ${c}.
+`
+                        delete p1.clothes[c]
+                    }
+                });
+                Object.keys(p2.clothes).forEach(c => {
+                    if (p2.bank <= p2.clothes[c]) {
+                        toJB += `- After the last game, you must take off your ${c}.
+`
+                        delete p2.clothes[c]
+                    }
+                });
+                pause = true
+                if(gameOver === false) nextPokerPhase()
+                expectingOutput = false
+                cooldown = 1
+                await saveData()
+                const a = "{{"
+                const b = "input"
+                const c = "}}"
+                await triggerSlash(`/send ${a + b + c}
+... |
+                    /setinput {{noop}} | /trigger`)
+                main_cont.style.display = "none"
+            })
             p1Call.addEventListener("click", function () {
                 let callVal = Math.min(p1.bank, poker.lastBet)
                 poker.playerMove(p1, Poker.MOVES.CALL, callVal)
                 hideMoveBtns()
-                nextPokerPhase()
                 //tell ai: which cards to discard
-                const a = "{{"
-                const b = "input"
-                const c = "}}"
-                triggerSlash(`/send ${a + b + c} |
-                /setinput {{noop}}`)
-                toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
-- You now have a chance to improve your hand. Please add the following to the end of your response:
-<move>
-Discard: [cards in your hand that you want replaced, separated by commas.]
-</move>
-- Cards are represented by two characters. The first character represents the card's value. For example, ace is represented by A, king by K, 7 as 7, and 10 by T, and so on. The second character represents its suit: S - spade, H - heart, C - club, and D - diamond. Here's an example:
-<move>
-Discard: TS, AH, 7C, KD
-</move>
-- If you're happy with your hand, leave it blank.
-<move>
-Discard:
-</move>
-                `
+                nextPokerPhase()
             })
             p1Check.addEventListener("click", function () {
                 poker.playerMove(p1, Poker.MOVES.CHECK)
@@ -1163,86 +1344,22 @@ Discard:
                 if (poker.lastBetter === p1) {
                     //tell ai: which cards to discard????
                     nextPokerPhase()
-                    const a = "{{"
-                    const b = "input"
-                    const c = "}}"
-                    triggerSlash(`/send ${a + b + c} |
-                /setinput {{noop}}`)
-                    toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
-- You now have a chance to improve your hand. Please add the following to the end of your response:
-<move>
-Discard: [cards in your hand that you want replaced, separated by commas.]
-</move>
-- Cards are represented by two characters. The first character represents the card's value. For example, ace is represented by A, king by K, 7 as 7, and 10 by T, and so on. The second character represents its suit: S - spade, H - heart, C - club, and D - diamond. Here's an example:
-<move>
-Discard: TS, AH, 7C, KD
-</move>
-- If you're happy with your hand, leave it blank.
-<move>
-Discard:
-</move>
-                `
                 }
                 else {
                     //showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
                     //tell ai to: check, raise, fold
-                    const a = "{{"
-                    const b = "input"
-                    const c = "}}"
-                    triggerSlash(`/send ${a + b + c} |
-                /setinput {{noop}}`)
-                    toJB += `- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
-- Your choices are to check or raise.
-- To make your choice, please include the following at the end of your response:
-<move>
-[Your move here]
-</move>
-- If you choose to check, simply end with:
-<move>
-Check
-</move>
-- If you choose to raise, include your bet. Here's an example:
-<move>
-Raise: 10
-</move>
-- There's no limit to betting. However, it's limited to your current bank, which is only ${p2.bank}. Going all in means betting your entire bank.
-                        `
+                    aiMakeMove("check")
                     updateStats()
                 }
             })
             p1Raise.addEventListener("click", function () {
-                let raiseVal = Number.parseInt(p1RaiseInput.value) + poker.lastBet
+                let raiseVal = Number.parseInt(p1RaiseInput.value)
                 raiseVal = Math.min(p1.bank, raiseVal)
                 poker.playerMove(p1, Poker.MOVES.RAISE, raiseVal)
                 hideMoveBtns()
                 //showAvailableBtns(MOVES_AFTER_RAISE, p2BtnsArr)
                 //tell ai to: call, raise, fold
-                const a = "{{"
-                const b = "input"
-                const c = "}}"
-                triggerSlash(`/send ${a + b + c} |
-                /setinput {{noop}}`)
-                toJB += `- {{user}} raised ${poker.lastBet}
-- Your hand: ${p2.hand} - ${poker.descriptiveHand(poker.evaluateHand(p2.hand))}
-- Your choices are to call, raise or fold.
-- To make your choice, please include the following at the end of your response:
-<move>
-[Your move here]
-</move>
-- If you choose to call, simply end with:
-<move>
-Call
-</move>
-- Same for fold:
-<move>
-Fold
-</move>
-- If you choose to raise, include your bet. Here's an example:
-<move>
-Raise: 10
-</move>
-- There's no limit to betting. However, it's limited to your current bank, which is only ${p2.bank}. Going all in means betting your entire bank.
-                `
+                aiMakeMove("raise", raiseVal)
                 updateStats()
             })
             p1Fold.addEventListener("click", function () {
@@ -1250,18 +1367,18 @@ Raise: 10
                 hideMoveBtns()
                 updateStats()
                 //tell ai: it won after user folding
-                const a = "{{"
-                const b = "input"
-                const c = "}}"
-                triggerSlash(`/send ${a + b + c} |
-                /setinput {{noop}}`)
-                toJB += `- {{user}} folds. You win.
-                `
+                toJB += `- {{user}} folded. You won.
+`
+                continueBtn.style.visibility = "visible"
             })
 
-            // await updateJB()
-            console.log(poker)
-            saveData()
+            //main func start here
+
+            getAIMove(aiMove)
+            nextPokerPhase(false)
+
+            if (await handleAIMesEdit()) return
+            await saveData()
         })
     </script>
 </body>
