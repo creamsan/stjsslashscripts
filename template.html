@@ -137,6 +137,7 @@
 
         //user side
         function loadChatData() {
+            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
             toJB = chatData.toJB
             gameOver = chatData.gameOver
             swiped = chatData.swiped
@@ -174,7 +175,7 @@
             }
 
             for (const element of toVerify) {
-                if (element == "" || wrongFormat(element)) {
+                if (element == "" || correctFormat(element)) {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
@@ -191,7 +192,7 @@
         }
 
 
-        function wrongFormat(aiInput) {
+        function correctFormat(aiInput) {
             //extra verifaction
 
         }
@@ -268,15 +269,20 @@ ${origInput}
 
         //main
         document.addEventListener("DOMContentLoaded", async function () {
+            //ai
             initError()
             await loadAIReply()
+            
+            //ai user
             await loadChatData()
 
+            //ai
             //intro handler - for multi intro cards
             if (chatMessages.message_id === 0) {
 
             }
 
+            //ai
             //regexes here
             const regexVar = /regex/i
             const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
@@ -287,6 +293,7 @@ ${origInput}
                 return
             }
 
+            //ai
             if (await handleSwipe()) return
 
             //user

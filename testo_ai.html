@@ -51,9 +51,11 @@
             cursor: pointer;
             transition: background-color 0.3s ease, transform 0.2s ease;
         }
+
         .stylized-button:hover {
             transform: scale(1.05);
         }
+
         .stylized-button:active {
             transform: scale(0.95);
         }
@@ -66,163 +68,171 @@
             <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
         <div id="error_msg">
-            The AI did not produce the expected output. Please swipe or regenerate. If this is the first message, you should ignore this.
+            The AI did not produce the expected output. Please swipe or regenerate. If this is the intro, you
+            should ignore this.
         </div>
         <button class="stylized-button" id="ignore_btn">Ignore</button>
     </div>
     <div id="main_cont"></div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", async function () {
-            //init html stuff
-            const main_cont = document.getElementById("main_cont")
-            const error = document.getElementById("error")
+        const main_cont = document.getElementById("main_cont")
+
+
+        //ai side
+        const error = document.getElementById("error")
+        function initError() {
             const error_msg = document.getElementById("error_msg")
             const errorIgnoreBtn = document.getElementById("ignore_btn")
             errorIgnoreBtn.addEventListener("click", function () {
                 main_cont.style.display = "flex"
                 error.style.display = "none"
             })
+        }
 
 
-            //load ai reply
-            let newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]["swipes"]
-            let input = newGenSwipes[newGenSwipes.length - 1]
+        //ai side
+        let chatMessages
+        let input
+        async function loadAIReply() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
+            input = chatMessages[chatMessages.length - 1]
             const regexInput = /<result>[\S\s]+?<\/result>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+        }
 
 
-            //load chatdata - ai side
-            let toJB = ""
-            let gameOver
-            let swiped
-            let toCut
-            let userMesEdited
-            let expectingOutput
-            let chatData = `{{getvar::chatData}}`
-            if (chatData == "") {
-                await insertOrAssignVariables({chatData: {}})
-                chatData = getVariables()["chatData"]
+        let toJB
+        let gameOver
+        let swiped
+        let toCut
+        let userMesEdited
+        let aiMesEdited
+        let expectingOutput
+        let chatData
+        //ai side
+        async function loadChatData() {
+            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+            if (chatData == null) {
+                await triggerSlash(`/setvar key=chatData {}`)
+                chatData = {}
                 toJB = ""
                 gameOver = false
                 swiped = false
                 toCut = true
                 expectingOutput = false
                 userMesEdited = false
+                aiMesEdited = false
             }
             else {
-                chatData = getVariables()["chatData"]
-                toJB = chatData["toJB"]
-                gameOver = chatData["gameOver"]
-                swiped = chatData["swiped"]
-                toCut = chatData["toCut"]
-                expectingOutput = chatData["expectingOutput"]
+                toJB = chatData.toJB
+                gameOver = chatData.gameOver
+                swiped = chatData.swiped
+                toCut = chatData.toCut
+                expectingOutput = chatData.expectingOutput
                 userMesEdited = false
+                aiMesEdited = chatData.aiMesEdited
             }
+        }
 
 
-            //save data func
-            async function saveData() {
-                chatData["gameOver"] = gameOver
-                chatData["swiped"] = swiped
-                chatData["toCut"] = toCut
-                chatData["expectingOutput"] = expectingOutput
-                chatData["userMesEdited"] = userMesEdited
-                chatData["toJB"] = toJB
-                await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
-            }
+        async function saveData() {
+            chatData.toJB = toJB
+            chatData.gameOver = gameOver
+            chatData.swiped = swiped
+            chatData.toCut = toCut
+            chatData.expectingOutput = expectingOutput
+            chatData.userMesEdited = userMesEdited
+            chatData.aiMesEdited = aiMesEdited
+            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+        }
 
 
-            //intro handler
-            if(newGenSwipes["message_id"] === 0) {
-
-            }
-
-
-            //verifiers - ai side
+        //ai side
+        function verifyInputs(toVerify) {
             if (gameOver) {
                 main_cont.parentNode.removeChild(main_cont)
-                saveData()
-                return
+                return false
             }
 
-            
-            // if (input == "") {
-            //     main_cont.style.display = "none"
-            //     error.style.display = "flex"
-            //     saveData()
-            //     return
-            // }
-            
+            const mesId = chatMessages.message_id
 
-            const toVerify = []
+            if (input == "") {
+                main_cont.style.display = "none"
+                error.style.display = "flex"
+                return false
+            }
+
             for (const element of toVerify) {
-                if (element == "" && expectingOutput) {
+                if (element == "" || correctFormat(element)) {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
-                    saveData()
-                    return
+                    return false
                 }
             }
             expectingOutput = false
 
+            if (mesId === 0) {
+                main_cont.style.display = "none"
+                error.style.display = "none"
+            }
 
-            //swipe handler - ai side
-            eventOnce(tavern_events.MESSAGE_SWIPED, function () {
+            return true
+        }
+
+
+        function correctFormat(aiInput) {
+            //extra verifaction
+
+        }
+
+
+        //ai side
+        async function handleSwipe() {
+            eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
                 //change some data and save everything before swipe
                 swiped = true
-                
-                saveData()
+                await saveData()
             })
-            if(swiped) {
-                newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]["swipes"]
+            if (swiped) {
+                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
                 const swipeGen = newGenSwipes[newGenSwipes.length - 1]
-                if(swipeGen === "...") {
-                    saveData()
-                    return
+                if (swipeGen === "...") {
+                    await saveData()
+                    return true
                 }
                 input = swipeGen
                 swiped = false
             }
+            return false
+        }
 
 
-            //edit handler - user side
-            // if(userMesEdited) {
-            //     main_cont.parentNode.removeChild(main_cont)
-            //     saveData()
-            //     return
-            // }
-            // userMesEdited = true
-            // swiped = false
+        //ai side
+        async function handleAIMesEdit() {
+            if (aiMesEdited) {
+                await saveData()
+                return true
+            }
+            aiMesEdited = true
+            return false
+        }
 
 
-            //main
-            toJB += "awooga"
-            //await updateJB()
+        //main
+        document.addEventListener("DOMContentLoaded", async function () {
+            initError()
+            await loadAIReply()
+            await loadChatData()
+
+            //main func start here
+
+            toJB += "awoogaa"
+
+            //ai
+            if (await handleAIMesEdit()) return
+
             await saveData()
-            
-
-            async function updateJB() {
-                await insertOrAssignVariables({jbout: toJB})
-                //toJB = ""
-            }
-
-
-            //for AI message manipulation - ai side
-            //display the manipulated AI message
-            //hide the original AI message
-            function updateAIMes() {
-                if (toCut) {
-                    toCut = false
-                    triggerSlash(`/sendas name="{{char}}" ${input} |
-/sendas name="{{char}}" <details><summary>Original</summary>
-${origInput}
-</details> |
-/cut {{lastMessageId}} |
-/hide {{lastMessageId}}
-                    `)
-                }
-            }
         })
     </script>
 </body>

@@ -907,6 +907,7 @@
             }
 
             if (mesId === 0 || expectingOutput === false) {
+                pause = true
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -1037,10 +1038,10 @@
         function updateStats() {
             let toAppend = ""
             if (poker.phase === Poker.PHASE.EXCHANGE) {
-                toAppend = "<br>Select the cards you want to exchange."
+                toAppend = `<br>Opponent discarded ${p2ToExchange.length} cards.<br>Select the cards you want to exchange.`
             }
             else if (poker.phase === Poker.PHASE.SHOWDOWN) {
-                toAppend = `<br>${poker.roundWinner.player.name === "{{user}}" ? "You win" : "You lost"}<br>Winning hand: ${poker.roundWinner.hand}`
+                toAppend = `<br>${poker.roundWinner.player.name === "{{user}}" ? "You won" : "You lost"}<br>Winning hand: ${poker.roundWinner.hand}`
             }
             output.innerHTML = `Pot: $${poker.pot}<br>Last bet: $${poker.lastBet}<br>Bank: $${poker.player1.bank}${toAppend}`
         }
@@ -1276,6 +1277,8 @@
             //buttons
             exchangeBtn.addEventListener("click", async function () {
                 pause = true
+                toJB += `- {{user}} discarded ${p1ToExchange.length} cards.
+`
                 //player
                 p1.discard(p1ToExchange)
                 for (let i = 0; i < p1ToExchange.length; i++) {
