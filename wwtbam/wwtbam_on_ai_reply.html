@@ -521,10 +521,14 @@
                 const a = "{{"
                 const b = "input"
                 const c = "}}"
-                triggerSlash(`/send ${a + b + c}
-... |
-                /setinput {{noop}} |
-                /trigger`)
+                if(`${a+b+c}` == "") {
+                    await triggerSlash(`/send ... |
+                        /setinput {{noop}} | /trigger`)
+                }
+                else {
+                    await triggerSlash(`/send ${a+b+c} |
+                        /setinput {{noop}} | /trigger`)
+                }
 
                 saveData()
             }

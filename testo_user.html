@@ -85,7 +85,6 @@
         let swiped
         let toCut
         let userMesEdited
-        let aiMesEdited
         let expectingOutput
         let chatData
 
@@ -98,7 +97,6 @@
             toCut = chatData.toCut
             expectingOutput = chatData.expectingOutput
             userMesEdited = chatData.userMesEdited
-            aiMesEdited = false
         }
 
         async function saveData() {
@@ -108,7 +106,6 @@
             chatData.toCut = toCut
             chatData.expectingOutput = expectingOutput
             chatData.userMesEdited = userMesEdited
-            chatData.aiMesEdited = aiMesEdited
             await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 

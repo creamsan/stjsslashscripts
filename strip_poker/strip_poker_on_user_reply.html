@@ -72,7 +72,6 @@
         let toJB
         let gameOver
         let userMesEdited
-        let aiMesEdited
         let pokerData
         let cooldown
         let expectingOutput
@@ -81,7 +80,6 @@
             toJB = chatData.toJB
             gameOver = chatData.gameOver
             userMesEdited = chatData.userMesEdited
-            aiMesEdited = false
             pokerData = chatData.pokerData
             cooldown = chatData.cooldown
             expectingOutput = chatData.expectingOutput
@@ -92,7 +90,6 @@
             chatData.gameOver = gameOver
             chatData.toJB = toJB
             chatData.userMesEdited = userMesEdited
-            chatData.aiMesEdited = aiMesEdited
             chatData.cooldown = cooldown
             chatData.expectingOutput = expectingOutput
             await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
@@ -208,15 +205,12 @@
                 toJB += `- The cards are being shuffled.
 - Do not bet yet.
 - In the meantime, engage with {{user}}`
-                await updateJB()
-                await saveData()
-                return
             }
-
-            const hand = pokerData.player2.hand
-            switch (pokerData.phase) {
-                case poker.PHASE.PRE_EXCHANGE_BETS:
-                    toJB += `- It is now the pre-exchange betting phase.
+            else {
+                const hand = pokerData.player2.hand
+                switch (pokerData.phase) {
+                    case poker.PHASE.PRE_EXCHANGE_BETS:
+                        toJB += `- It is now the pre-exchange betting phase.
 - Your hand: ${hand} - ${descriptiveHand(evaluateHand(hand))}
 - Please include the following at the end of your response:
 <move>
@@ -234,10 +228,9 @@ Discard: AH, 7C, KD, TS
 Bet: 50
 </move>
 `
-                    expectingOutput = true
-                    break
-                case poker.PHASE.POST_EXCHANGE_BETS:
-                    toJB += `- It is now the post-exchange betting phase.
+                        break
+                    case poker.PHASE.POST_EXCHANGE_BETS:
+                        toJB += `- It is now the post-exchange betting phase.
 - Your hand: ${hand} - ${descriptiveHand(evaluateHand(hand))}
 - Please include the following at the end of your response:
 <move>
@@ -248,10 +241,10 @@ Bet: [How much you're willing to bet for this hand, from 0 to ${pokerData.player
 Bet: 20
 </move>
 `
-                    expectingOutput = true
-                    break
+                        break
+                }
+                expectingOutput = true
             }
-
             //main func start here
             await updateJB()
             await saveData()

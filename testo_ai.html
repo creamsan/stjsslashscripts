@@ -107,7 +107,6 @@
         let swiped
         let toCut
         let userMesEdited
-        let aiMesEdited
         let expectingOutput
         let chatData
         //ai side
@@ -122,7 +121,6 @@
                 toCut = true
                 expectingOutput = false
                 userMesEdited = false
-                aiMesEdited = false
             }
             else {
                 toJB = chatData.toJB
@@ -131,7 +129,6 @@
                 toCut = chatData.toCut
                 expectingOutput = chatData.expectingOutput
                 userMesEdited = false
-                aiMesEdited = chatData.aiMesEdited
             }
         }
 
@@ -143,7 +140,6 @@
             chatData.toCut = toCut
             chatData.expectingOutput = expectingOutput
             chatData.userMesEdited = userMesEdited
-            chatData.aiMesEdited = aiMesEdited
             await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
@@ -208,17 +204,6 @@
         }
 
 
-        //ai side
-        async function handleAIMesEdit() {
-            if (aiMesEdited) {
-                await saveData()
-                return true
-            }
-            aiMesEdited = true
-            return false
-        }
-
-
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             initError()
@@ -228,9 +213,6 @@
             //main func start here
 
             toJB += "awoogaa"
-
-            //ai
-            if (await handleAIMesEdit()) return
 
             await saveData()
         })

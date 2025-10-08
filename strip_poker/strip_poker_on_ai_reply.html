@@ -722,7 +722,7 @@
             }
 
             addCardToHand(card) {
-                if(this.#hand.length === 5) return
+                if (this.#hand.length === 5) return
                 this.#hand.push(card)
             }
 
@@ -795,7 +795,6 @@
         let swiped
         let toCut
         let userMesEdited
-        let aiMesEdited
         let chatData
         let cooldown
         let expectingOutput
@@ -809,7 +808,6 @@
                 gameOver = false
                 swiped = false
                 toCut = true
-                aiMesEdited = false
                 userMesEdited = false
                 cooldown = 0
                 expectingOutput = false
@@ -824,7 +822,6 @@
                 swiped = chatData.swiped
                 toCut = chatData.toCut
                 expectingOutput = chatData.expectingOutput
-                aiMesEdited = chatData.aiMesEdited
                 userMesEdited = false
                 cooldown = chatData.cooldown
                 poker = Poker.fromJSON(chatData.pokerData)
@@ -838,7 +835,6 @@
             chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.toCut = toCut
-            chatData.aiMesEdited = aiMesEdited
             chatData.userMesEdited = userMesEdited
             chatData.toJB = toJB
             chatData.expectingOutput = expectingOutput
@@ -920,17 +916,6 @@
         const regexDiscard = /discard:(\s*[2-9tajkq][schd],?){0,5}/i
         function correctFormat(aiInput) {
             return regexBet.test(aiInput) || regexDiscard.test(aiInput)
-        }
-
-
-        //ai side
-        async function handleAIMesEdit() {
-            if (aiMesEdited) {
-                await saveData()
-                return true
-            }
-            aiMesEdited = true
-            return false
         }
 
 
@@ -1301,9 +1286,14 @@
                 const a = "{{"
                 const b = "input"
                 const c = "}}"
-                await triggerSlash(`/send ${a + b + c}
-... |
-                /setinput {{noop}} | /trigger`)
+                if (`${a + b + c}` == "") {
+                    await triggerSlash(`/send ... |
+                        /setinput {{noop}} | /trigger`)
+                }
+                else {
+                    await triggerSlash(`/send ${a + b + c} |
+                        /setinput {{noop}} | /trigger`)
+                }
                 main_cont.style.display = "none"
             })
             continueBtn.addEventListener("click", async function () {
@@ -1322,16 +1312,21 @@
                     }
                 });
                 pause = true
-                if(gameOver === false) nextPokerPhase()
+                if (gameOver === false) nextPokerPhase()
                 expectingOutput = false
                 cooldown = 1
                 await saveData()
                 const a = "{{"
                 const b = "input"
                 const c = "}}"
-                await triggerSlash(`/send ${a + b + c}
-... |
-                    /setinput {{noop}} | /trigger`)
+                if (`${a + b + c}` == "") {
+                    await triggerSlash(`/send ... |
+                        /setinput {{noop}} | /trigger`)
+                }
+                else {
+                    await triggerSlash(`/send ${a + b + c} |
+                        /setinput {{noop}} | /trigger`)
+                }
                 main_cont.style.display = "none"
             })
             p1Call.addEventListener("click", function () {
@@ -1379,8 +1374,6 @@
 
             getAIMove(aiMove)
             nextPokerPhase(false)
-
-            if (await handleAIMesEdit()) return
             await saveData()
         })
     </script>
