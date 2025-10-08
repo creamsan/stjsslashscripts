@@ -19,7 +19,6 @@
         #main_cont {
             margin: 0 auto;
             width: 400px;
-            height: 400px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -74,7 +73,7 @@
         </div>
         <button class="stylized-button" id="ignore_btn">Ignore</button>
     </div>
-    <div id="main_cont">haa</div>
+    <div id="main_cont"></div>
 
     <script>
         const main_cont = document.getElementById("main_cont")
@@ -87,7 +86,6 @@
         let userMesEdited
         let expectingOutput
         let chatData
-
         //user side
         function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
@@ -125,13 +123,8 @@
 
         //user side
         async function updateJB() {
-            await insertOrAssignVariables({ jbout: "from jb: " + toJB })
-            //toJB = ""
-        }
-
-
-        async function updateJB2() {
-            await triggerSlash(`/setvar key=jbout2 from jb2: ${toJB}`)
+            await insertOrAssignVariables({ jbout: toJB })
+            toJB = ""
         }
 
 
@@ -142,16 +135,35 @@
             //user
             if (await handleUserMesEdit()) return
 
+
             //main func start here
-            toJB += " meow"
+            toJB += `- {{user}}'s particles currently seems predictable. But you can see two outcomes rather than one. It's time to test it though.
+- At the end of your next response, please include the following:
+<predictions>
+Prediction A
+Title: [Title of this outcome, one to five words should suffice]
+Content: [Here, you will play the role of {{user}}. Describe the upcoming events from his perspective. Use first-person pronouns during dialogue and narration. If included, refer to {{char}} in the third person.]
+
+Prediction B
+Title: [Title of this outcome, one to five words should suffice]
+Content: [Same guidelines as the above content.]
+</predictions>
+
+- Here's an example:
+<predictions>
+Prediction A
+Title: Spooked
+Content: I stumbled back, my shoulder hitting the doorframe. "Hey! WTF! where'd you came from? Oh shit, a ghost?"
+
+Prediction B
+Title: Confused
+Content: "Uh... Who...? What are you talking about?" I took a cautious step back as my eyes scanned her. "Maybe you should sit down."
+</predictions>
+`
+
 
             //user
             await updateJB()
-            await updateJB2()
-            await insertOrAssignVariables({ jbout3: "from jb ext: " + toJB })
-
-            toJB = ""
-
             await saveData()
         })
     </script>

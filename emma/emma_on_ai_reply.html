@@ -10,21 +10,26 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Helvetica Neue', Arial, monospace;
             font-size: 0.8em;
             width: 100%;
             margin: 0;
         }
 
         #main_cont {
+            font-family: monospace, sans-serif;
+            background-image: url("https://wallpaperaccess.com/full/19924.jpg");
+            background-size: cover;
             margin: 0 auto;
             width: 400px;
             display: flex;
+            flex-direction: column;
+            gap: 10px;
             justify-content: center;
             align-items: center;
             gap: 20px;
             border-radius: 7px;
-            background-color: aqua;
+            padding: 10px
         }
 
         #error {
@@ -59,6 +64,21 @@
         .stylized-button:active {
             transform: scale(0.95);
         }
+
+        .choices {
+            padding: 10px;
+            background-color: transparent;
+        }
+
+        .animated-text {
+            color: white;
+            transition: transform 0.3s ease, color 0.3s ease;
+        }
+        .animated-text:hover {
+            transform: scale(1.1);
+            color: white;
+            filter: blur(3px);
+        }
     </style>
 </head>
 
@@ -73,10 +93,17 @@
         </div>
         <button class="stylized-button" id="ignore_btn">Ignore</button>
     </div>
-    <div id="main_cont"></div>
+    <div id="main_cont">
+        <button id="choice1" class="stylized-button choices">choice 1</button>
+        <button id="choice2" class="stylized-button choices">choice 2</button>
+        <button id="reject" class="animated-text stylized-button choices">Reject fate</button>
+    </div>
 
     <script>
         const main_cont = document.getElementById("main_cont")
+        const choice1 = document.getElementById("choice1")
+        const choice2 = document.getElementById("choice2")
+        const reject = document.getElementById("reject")
 
 
         //ai side
@@ -97,7 +124,7 @@
         async function loadAIReply() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
             input = chatMessages[chatMessages.length - 1]
-            const regexInput = /<result>[\S\s]+?<\/result>/i
+            const regexInput = /<predictions>[\S\s]+?<\/predictions>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
 
@@ -108,6 +135,7 @@
         let toCut
         let userMesEdited
         let expectingOutput
+        let selected
         let chatData
         //ai side
         async function loadChatData() {
@@ -121,6 +149,7 @@
                 toCut = true
                 expectingOutput = false
                 userMesEdited = false
+                selected = ""
             }
             else {
                 toJB = chatData.toJB
@@ -129,19 +158,10 @@
                 toCut = chatData.toCut
                 expectingOutput = chatData.expectingOutput
                 userMesEdited = false
+                selected = chatData.selected
             }
         }
 
-        //user side
-        function loadChatData() {
-            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
-            toJB = chatData.toJB
-            gameOver = chatData.gameOver
-            swiped = chatData.swiped
-            toCut = chatData.toCut
-            expectingOutput = chatData.expectingOutput
-            userMesEdited = chatData.userMesEdited
-        }
 
         async function saveData() {
             chatData.toJB = toJB
@@ -150,6 +170,7 @@
             chatData.toCut = toCut
             chatData.expectingOutput = expectingOutput
             chatData.userMesEdited = userMesEdited
+            chatData.selected = selected
             await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
@@ -176,7 +197,6 @@
                     return false
                 }
             }
-            expectingOutput = false
 
             if (mesId === 0 || expectingOutput === false) {
                 main_cont.style.display = "none"
@@ -187,100 +207,47 @@
         }
 
 
-        //ai side
-        async function handleSwipe() {
-            eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
-                //change some data and save everything before swipe
-                swiped = true
-                await saveData()
-            })
-            if (swiped) {
-                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-                const swipeGen = newGenSwipes[newGenSwipes.length - 1]
-                if (swipeGen === "...") {
-                    await saveData()
-                    return true
-                }
-                input = swipeGen
-                swiped = false
-            }
-            return false
-        }
-
-
-        //user side
-        async function handleUserMesEdit() {
-            if (userMesEdited) {
-                main_cont.parentNode.removeChild(main_cont)
-                await saveData()
-                return true
-            }
-            userMesEdited = true
-            swiped = false
-            return false
-        }
-
-
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
-        }
-
-
-        //ai side
-        function updateAIMes() {
-            //display the manipulated AI message
-            //hide the original AI message
-            if (toCut) {
-                toCut = false
-                triggerSlash(`/sendas name="{{char}}" ${input} |
-                    /sendas name="{{char}}" <details><summary>Original</summary>
-${origInput}
-</details> |
-                    /cut {{lastMessageId}} |
-                    /hide {{lastMessageId}}
-                `)
-            }
-        }
-
-
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             //ai
             initError()
             await loadAIReply()
-            
-            //ai user
+
+            //ai
             await loadChatData()
 
             //ai
-            //intro handler - for multi intro cards
-            if (chatMessages.message_id === 0) {
-
-            }
-
-            //ai
             //regexes here
-            const regexVar = /regex/i
-            const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
+            const regexContent2 = /(?<=Prediction B[\S\s]+?Content:\s)[\S\s]+?(?=\s<\/predictions>)/i
+            const regexTitle1 = /(?<=<predictions>\s*Prediction A\s*Title:\s)[\S\s]+?(?=\sContent:)/i
+            const regexContent1 = /(?<=Prediction A[\S\s]+?Content:\s)[\S\s]+?(?=\nPrediction B)/i
+            const regexTitle2 = /(?<=Prediction B\s*Title:\s)[\S\s]+?(?=\sContent:)/i
+            const title1 = regexTitle1.test(input) ? (input.match(regexTitle1))[0] : ""
+            const content1 = regexContent1.test(input) ? (input.match(regexContent1))[0] : ""
+            const title2 = regexTitle2.test(input) ? (input.match(regexTitle2))[0] : ""
+            const content2 = regexContent2.test(input) ? (input.match(regexContent2))[0] : ""
 
-            const toVerify = []
+            const toVerify = [title1, content1, title2, content2]
             if (verifyInputs(toVerify) === false) {
                 await saveData()
                 return
             }
 
-            //ai
-            if (await handleSwipe()) return
-
-            //user
-            if (await handleUserMesEdit()) return
-
             //main func start here
+            choice1.innerText = title1
+            choice2.innerText = title2
+            choice1.addEventListener("click", function() {
+                //random
 
-            //user
-            await updateJB()
+            })
+            choice2.addEventListener("click", function() {
+                //chain
+
+            })
+            reject.addEventListener("click", function() {
+
+
+            })
 
             await saveData()
         })

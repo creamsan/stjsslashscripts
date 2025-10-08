@@ -10,21 +10,26 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Helvetica Neue', Arial, monospace;
             font-size: 0.8em;
             width: 100%;
             margin: 0;
         }
 
         #main_cont {
+            font-family: monospace, sans-serif;
+            background-image: url("https://wallpaperaccess.com/full/19924.jpg");
+            background-size: cover;
             margin: 0 auto;
             width: 400px;
             display: flex;
+            flex-direction: column;
+            gap: 10px;
             justify-content: center;
             align-items: center;
             gap: 20px;
             border-radius: 7px;
-            background-color: aqua;
+            padding: 10px
         }
 
         #error {
@@ -59,6 +64,35 @@
         .stylized-button:active {
             transform: scale(0.95);
         }
+
+        .choices {
+            padding: 10px;
+        }
+
+        #choice1 {
+            /* background-color: rgb(86, 43, 86); */
+            background-color: transparent;
+        }
+
+        #choice2 {
+            /* background-color: rgb(86, 43, 86); */
+            background-color: transparent;
+        }
+
+        #reject {
+            /* background-color: tomato; */
+            background-color: transparent;
+        }
+
+        .animated-text {
+            color: white;
+            transition: transform 0.3s ease, color 0.3s ease;
+        }
+        .animated-text:hover {
+            transform: scale(1.1);
+            color: white;
+            filter: blur(3px);
+        }
     </style>
 </head>
 
@@ -73,7 +107,11 @@
         </div>
         <button class="stylized-button" id="ignore_btn">Ignore</button>
     </div>
-    <div id="main_cont"></div>
+    <div id="main_cont">
+        <button id="choice1" class="stylized-button choices">choice 1</button>
+        <button id="choice2" class="stylized-button choices">choice 2</button>
+        <button id="reject" class="animated-text stylized-button choices">Reject fate</button>
+    </div>
 
     <script>
         const main_cont = document.getElementById("main_cont")
@@ -132,16 +170,6 @@
             }
         }
 
-        //user side
-        function loadChatData() {
-            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
-            toJB = chatData.toJB
-            gameOver = chatData.gameOver
-            swiped = chatData.swiped
-            toCut = chatData.toCut
-            expectingOutput = chatData.expectingOutput
-            userMesEdited = chatData.userMesEdited
-        }
 
         async function saveData() {
             chatData.toJB = toJB
@@ -163,14 +191,14 @@
 
             const mesId = chatMessages.message_id
 
-            if (input == "" && expectingOutput) {
+            if (input == "") {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 return false
             }
 
             for (const element of toVerify) {
-                if (expectingOutput && element == "") {
+                if (element == "" || correctFormat(element)) {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
@@ -178,7 +206,7 @@
             }
             expectingOutput = false
 
-            if (mesId === 0 || expectingOutput === false) {
+            if (mesId === 0) {
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -187,61 +215,9 @@
         }
 
 
-        //ai side
-        async function handleSwipe() {
-            eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
-                //change some data and save everything before swipe
-                swiped = true
-                await saveData()
-            })
-            if (swiped) {
-                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-                const swipeGen = newGenSwipes[newGenSwipes.length - 1]
-                if (swipeGen === "...") {
-                    await saveData()
-                    return true
-                }
-                input = swipeGen
-                swiped = false
-            }
-            return false
-        }
+        function correctFormat(aiInput) {
+            //extra verifaction
 
-
-        //user side
-        async function handleUserMesEdit() {
-            if (userMesEdited) {
-                main_cont.parentNode.removeChild(main_cont)
-                await saveData()
-                return true
-            }
-            userMesEdited = true
-            swiped = false
-            return false
-        }
-
-
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
-        }
-
-
-        //ai side
-        function updateAIMes() {
-            //display the manipulated AI message
-            //hide the original AI message
-            if (toCut) {
-                toCut = false
-                triggerSlash(`/sendas name="{{char}}" ${input} |
-                    /sendas name="{{char}}" <details><summary>Original</summary>
-${origInput}
-</details> |
-                    /cut {{lastMessageId}} |
-                    /hide {{lastMessageId}}
-                `)
-            }
         }
 
 
@@ -250,15 +226,9 @@ ${origInput}
             //ai
             initError()
             await loadAIReply()
-            
-            //ai user
-            await loadChatData()
 
             //ai
-            //intro handler - for multi intro cards
-            if (chatMessages.message_id === 0) {
-
-            }
+            await loadChatData()
 
             //ai
             //regexes here
@@ -271,16 +241,7 @@ ${origInput}
                 return
             }
 
-            //ai
-            if (await handleSwipe()) return
-
-            //user
-            if (await handleUserMesEdit()) return
-
             //main func start here
-
-            //user
-            await updateJB()
 
             await saveData()
         })
