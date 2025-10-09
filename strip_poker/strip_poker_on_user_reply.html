@@ -111,6 +111,7 @@
         //user side
         async function updateJB() {
             await insertOrAssignVariables({ jbout: toJB })
+            await triggerSlash("/delay 250")
             toJB = ""
         }
 
@@ -244,7 +245,7 @@ Bet: 20
                 }
                 expectingOutput = true
             }
-            
+
             //main func start here
             await updateJB()
             await saveData()
