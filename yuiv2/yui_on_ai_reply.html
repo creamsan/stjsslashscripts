@@ -241,7 +241,7 @@
             //load ai reply
             const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
             let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
-            const regexInput = /<result>[\S\s]+?<\/result>/i
+            const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
 
             const game = main_cont.querySelector("#game")

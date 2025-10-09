@@ -125,7 +125,7 @@
         async function loadAIReply() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
             input = chatMessages.swipes[chatMessages.swipes.length - 1]
-            const regexInput = /<predictions>[\S\s]+?<\/predictions>/i
+            const regexInput = /<predictions>([\S\s](?!<predictions>))+?<\/predictions>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
 

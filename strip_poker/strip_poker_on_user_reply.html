@@ -200,6 +200,8 @@
                 return
             }
 
+            toastr.info(pokerData.phase)
+
             if (cooldown > 0) {
                 cooldown--
                 toJB += `- The cards are being shuffled.

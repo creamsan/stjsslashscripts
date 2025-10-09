@@ -88,8 +88,9 @@
             //load input
             const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
             let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
-            const regexInput = /(?<=<rating>\s*)(yes|no)(?=\s*<\/rating>)/i
+            const regexInput = /<rating>([\S\s](?!<rating>))+?<\/rating>/i
             let rating = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+            input = /yes|no/i.test(input) ? (input.match(/yes|no/i))[0] : ""
 
 
             //load chatdata
