@@ -95,8 +95,8 @@
         let chatMessages
         let input
         async function loadAIReply() {
-            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-            input = chatMessages[chatMessages.length - 1]
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            input = chatMessages.swipes[chatMessages.swipes.length - 1]
             const regexInput = /<result>[\S\s]+?<\/result>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
@@ -107,7 +107,7 @@
         let swiped
         let toCut
         let userMesEdited
-        let expectingOutput
+        let expectingOutputOnId
         let chatData
         //ai side
         async function loadChatData() {
@@ -119,7 +119,7 @@
                 gameOver = false
                 swiped = false
                 toCut = true
-                expectingOutput = false
+                expectingOutputOnId = false
                 userMesEdited = false
             }
             else {
@@ -127,7 +127,7 @@
                 gameOver = chatData.gameOver
                 swiped = chatData.swiped
                 toCut = chatData.toCut
-                expectingOutput = chatData.expectingOutput
+                expectingOutputOnId = chatData.expectingOutputOnId
                 userMesEdited = false
             }
         }
@@ -139,7 +139,7 @@
             gameOver = chatData.gameOver
             swiped = chatData.swiped
             toCut = chatData.toCut
-            expectingOutput = chatData.expectingOutput
+            expectingOutputOnId = chatData.expectingOutputOnId
             userMesEdited = chatData.userMesEdited
         }
 
@@ -148,7 +148,7 @@
             chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.toCut = toCut
-            chatData.expectingOutput = expectingOutput
+            chatData.expectingOutputOnId = expectingOutputOnId
             chatData.userMesEdited = userMesEdited
             await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
@@ -163,22 +163,21 @@
 
             const mesId = chatMessages.message_id
 
-            if (input == "" && expectingOutput) {
+            if (expectingOutputOnId === mesId && input == "") {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 return false
             }
 
             for (const element of toVerify) {
-                if (expectingOutput && element == "") {
+                if (expectingOutputOnId === mesId && element == "") {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
                 }
             }
-            expectingOutput = false
 
-            if (mesId === 0 || expectingOutput === false) {
+            if (mesId === 0 || expectingOutputOnId != mesId) {
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -281,6 +280,9 @@ ${origInput}
 
             //user
             await updateJB()
+
+            //ai
+            await handleAIMesEdit()
 
             await saveData()
         })

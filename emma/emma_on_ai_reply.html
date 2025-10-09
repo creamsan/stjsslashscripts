@@ -74,6 +74,7 @@
             color: white;
             transition: transform 0.3s ease, color 0.3s ease;
         }
+
         .animated-text:hover {
             transform: scale(1.1);
             color: white;
@@ -122,21 +123,19 @@
         let chatMessages
         let input
         async function loadAIReply() {
-            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-            input = chatMessages[chatMessages.length - 1]
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            input = chatMessages.swipes[chatMessages.swipes.length - 1]
             const regexInput = /<predictions>[\S\s]+?<\/predictions>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
 
 
         let toJB
-        let gameOver
-        let swiped
-        let toCut
         let userMesEdited
-        let expectingOutput
+        let expectingOutputOnId
         let selected
         let chatData
+        let cooldown
         //ai side
         async function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
@@ -144,61 +143,55 @@
                 await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
                 toJB = ""
-                gameOver = false
-                swiped = false
-                toCut = true
-                expectingOutput = false
+                expectingOutputOnId = -1
                 userMesEdited = false
                 selected = ""
+                cooldown = 0
             }
             else {
                 toJB = chatData.toJB
-                gameOver = chatData.gameOver
-                swiped = chatData.swiped
-                toCut = chatData.toCut
-                expectingOutput = chatData.expectingOutput
+                expectingOutputOnId = chatData.expectingOutputOnId
                 userMesEdited = false
                 selected = chatData.selected
+                cooldown = chatData.cooldown
             }
         }
 
 
         async function saveData() {
             chatData.toJB = toJB
-            chatData.gameOver = gameOver
-            chatData.swiped = swiped
-            chatData.toCut = toCut
-            chatData.expectingOutput = expectingOutput
+            chatData.expectingOutputOnId = expectingOutputOnId
             chatData.userMesEdited = userMesEdited
             chatData.selected = selected
+            chatData.cooldown = cooldown
             await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
 
         //ai side
         function verifyInputs(toVerify) {
-            if (gameOver) {
+            if (cooldown > 0) {
                 main_cont.parentNode.removeChild(main_cont)
                 return false
             }
 
             const mesId = chatMessages.message_id
 
-            if (input == "" && expectingOutput) {
+            if (input == "" && expectingOutputOnId === mesId) {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 return false
             }
 
             for (const element of toVerify) {
-                if (expectingOutput && element == "") {
+                if (expectingOutputOnId === mesId && element == "") {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
                 }
             }
 
-            if (mesId === 0 || expectingOutput === false) {
+            if (mesId === 0 || expectingOutputOnId !== mesId) {
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -236,18 +229,35 @@
             //main func start here
             choice1.innerText = title1
             choice2.innerText = title2
-            choice1.addEventListener("click", function() {
+            choice1.addEventListener("click", async function () {
                 //random
+                toJB = `- {{user}} acted as predicted. But you still need more data.
+`
+                cooldown = 2
+                await saveData()
+                await triggerSlash(`/send ${content1} | /trigger`)
+                main_cont.style.display = "none"
 
             })
-            choice2.addEventListener("click", function() {
+            choice2.addEventListener("click", async function () {
                 //chain
-
+                toJB = `- {{user}} acted as predicted. But you still need more data.
+`
+                selected = true
+                await saveData()
+                await triggerSlash(`/send ${content2} | /trigger`)
+                main_cont.style.display = "none"
             })
-            reject.addEventListener("click", function() {
-
-
+            reject.addEventListener("click", async function () {
+                toJB = `- It happened again. {{user}}'s' immeasurable unpredictability. Need more data.
+`
+                cooldown = 2
+                await saveData()
+                main_cont.style.display = "none"
             })
+
+            toJB = `- Need more data.
+`
 
             await saveData()
         })
