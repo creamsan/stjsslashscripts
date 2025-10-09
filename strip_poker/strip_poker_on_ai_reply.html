@@ -792,8 +792,6 @@
 
         let toJB
         let gameOver
-        let swiped
-        let toCut
         let userMesEdited
         let chatData
         let cooldown
@@ -806,8 +804,6 @@
                 chatData = {}
                 toJB = ""
                 gameOver = false
-                swiped = false
-                toCut = true
                 userMesEdited = false
                 cooldown = 0
                 expectingOutput = false
@@ -819,8 +815,6 @@
             else {
                 toJB = chatData.toJB
                 gameOver = chatData.gameOver
-                swiped = chatData.swiped
-                toCut = chatData.toCut
                 expectingOutput = chatData.expectingOutput
                 userMesEdited = false
                 cooldown = chatData.cooldown
@@ -833,8 +827,6 @@
 
         async function saveData() {
             chatData.gameOver = gameOver
-            chatData.swiped = swiped
-            chatData.toCut = toCut
             chatData.userMesEdited = userMesEdited
             chatData.toJB = toJB
             chatData.expectingOutput = expectingOutput
@@ -1279,8 +1271,6 @@
                 p2ToExchange = []
 
                 showCardsToExchange(p1.hand)
-                exchangeBtn.style.visibility = "hidden"
-                continueBtn.style.visibility = "visible"
                 nextPokerPhase()
                 await saveData()
                 const a = "{{"
@@ -1312,9 +1302,9 @@
                     }
                 });
                 pause = true
-                if (gameOver === false) nextPokerPhase()
                 expectingOutput = false
                 cooldown = 1
+                if (gameOver === false) nextPokerPhase()
                 await saveData()
                 const a = "{{"
                 const b = "input"
