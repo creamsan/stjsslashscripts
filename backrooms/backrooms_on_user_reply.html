@@ -8,14 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
         integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script src="https://unpkg.com/kaplay@4000.0.0-alpha.22/dist/kaplay.js"></script>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
             font-size: 0.8em;
-            margin: 0;
             width: 100%;
-            height: fit-content;
+            margin: 0;
         }
 
         #main_cont {
@@ -27,10 +25,6 @@
             gap: 20px;
             border-radius: 7px;
             background-color: aqua;
-        }
-
-        canvas {
-            margin: 0 auto;
         }
 
         #error {
@@ -255,7 +249,7 @@ ${origInput}
             //ai
             initError()
             await loadAIReply()
-
+            
             //ai user
             await loadChatData()
 

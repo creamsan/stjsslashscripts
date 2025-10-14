@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
         integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://unpkg.com/kaplay@4000.0.0-alpha.22/dist/kaplay.js"></script>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -82,6 +83,7 @@
 
     <script>
         const main_cont = document.getElementById("main_cont")
+        const game = document.querySelector("canvas")
 
 
         //ai side
@@ -137,16 +139,6 @@
             }
         }
 
-        //user side
-        function loadChatData() {
-            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
-            toJB = chatData.toJB
-            gameOver = chatData.gameOver
-            swiped = chatData.swiped
-            toCut = chatData.toCut
-            expectingOutputOnId = chatData.expectingOutputOnId
-            userMesEdited = chatData.userMesEdited
-        }
 
         async function saveData() {
             chatData.toJB = toJB
@@ -191,105 +183,190 @@
         }
 
 
-        //ai side
-        async function handleSwipe() {
-            eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
-                //change some data and save everything before swipe
-                swiped = true
-                await saveData()
-            })
-            if (swiped) {
-                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-                const swipeGen = newGenSwipes[newGenSwipes.length - 1]
-                if (swipeGen === "...") {
-                    await saveData()
-                    return true
+        const sample = {
+            cards: [
+                { name: "dog", img: "dog", rarity: "common" },
+                { name: "girl", img: "cute_little_girl_cute_dress", rarity: "rare" },
+                { name: "house", img: "house", rarity: "rare" },
+                { name: "bomb", img: "bomb", rarity: "dangerous"}
+            ],
+            combo: [
+                [],
+                [],
+                [],
+                [],
+                []
+            ]
+        }
+
+
+        function initCards() {
+            const RARITY_COLORS = {
+                dangerous: color(212, 34, 34),
+                junk: color(160, 140, 108),
+                common: color(90, 196, 124),
+                rare: color(135, 62, 199),
+                legendary: color(230, 176, 28),
+            }
+            sample.cards.forEach(card => {
+                const c = add([
+                    rect(70, 100),
+                    area(),
+                    outline(1),
+                    RARITY_COLORS[card.rarity],
+                    pos(rand(0, canvas.width / 2), rand(0, canvas.height)),
+                    anchor("center"),
+                    "card",
+                    z(0),
+                    {
+                        update() {
+                            this.z = this.pos.y
+                        }
+                    },
+                    {
+                        name: card.name,
+                        img: card.img,
+                        rarity: card.rarity
+                    },
+                ])
+
+                //add pic
+                loadSprite(card.img, `https://image.pollinations.ai/prompt/${card.img}`)
+                c.add([
+                    sprite(card.img, {
+                        width: 64,
+                        height: 64,
+                        fill: true,
+                    }),
+                    outline(1),
+                    color(255, 255, 255),
+                    pos(-32, -40),
+                    z(0),
+                    {
+                        update() { this.z = c.pos.y; }
+                    },
+                ])
+
+            });
+
+            //card dragging
+            let startDragPos = vec2(0)
+            let newDragPos = vec2(0)
+            let held = []
+            onClick("card", function (card) {
+                if (held.length > 0) {
+                    return
                 }
-                input = swipeGen
-                swiped = false
-            }
-            return false
-        }
+                startDragPos = mousePos()
+                held.push(card.id)
+                const drag = onMouseMove(() => {
+                    newDragPos = startDragPos - mousePos()
+                    startDragPos = mousePos()
+                    card.pos = startDragPos
+                })
+                onMouseRelease("left", () => {
+                    drag.cancel()
+                    held = []
+                })
+            })
 
-
-        //user side
-        async function handleUserMesEdit() {
-            if (userMesEdited) {
-                main_cont.parentNode.removeChild(main_cont)
-                await saveData()
-                return true
-            }
-            userMesEdited = true
-            swiped = false
-            return false
-        }
-
-
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
-        }
-
-
-        //ai side
-        function updateAIMes() {
-            //display the manipulated AI message
-            //hide the original AI message
-            if (toCut) {
-                toCut = false
-                triggerSlash(`/sendas name="{{char}}" ${input} |
-                    /sendas name="{{char}}" <details><summary>Original</summary>
-${origInput}
-</details> |
-                    /cut {{lastMessageId}} |
-                    /hide {{lastMessageId}}
-                `)
-            }
+            //card hover
+            const tooltip = add([
+                rect(150, 70),
+                pos(1000, 1000),
+                color(107, 115, 108),
+                opacity(0.9),
+                z(canvas.height),
+                {
+                    update() {
+                        if (this.hidden) {
+                            this.pos = vec2(1000)
+                        }
+                        else {
+                            this.pos = mousePos()
+                            this
+                        }
+                    }
+                },
+                "tooltip",
+                {
+                    nameTxt: "name",
+                    rarityTxt: "rarity"
+                }
+            ])
+            const tooltipTxt = tooltip.add([
+                z(canvas.height + 1),
+                pos(5),
+                color(255, 255, 255),
+                text("", {
+                    size: 18
+                }),
+                "tooltipText"
+            ])
+            tooltip.hidden = true
+            let hovered = []
+            onHover("card", function (card) {
+                hovered.push(card)
+                hovered = hovered.sort((a,b) => b.z - a.z)
+                tooltipTxt.text = `${hovered[0].name}
+${hovered[0].rarity}`
+                tooltip.hidden = false
+                tooltip.pos = mousePos() 
+            })
+            onHoverEnd("card", function (card) {
+                hovered = hovered.filter(c => c.id !== card.id)
+                if (hovered.length > 0) {
+                    tooltipTxt.text = `${hovered[0].name}
+${hovered[0].rarity}`
+                    return
+                }
+                tooltip.hidden = true
+                tooltip.pos = vec2(canvas.width + 100, canvas.height + 100)
+                hovered = []
+            })
         }
 
 
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             //ai
-            initError()
-            await loadAIReply()
-            
+            //initError()
+            //await loadAIReply()
+
             //ai user
-            await loadChatData()
+            //await loadChatData()
 
             //ai
             //intro handler - for multi intro cards
-            if (chatMessages.message_id === 0) {
+            // if (chatMessages.message_id === 0) {
 
-            }
+            // }
 
             //ai
             //regexes here
-            const regexVar = /regex/i
-            const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
+            // const regexVar = /regex/i
+            // const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
 
-            const toVerify = []
-            if (verifyInputs(toVerify) === false) {
-                await saveData()
-                return
-            }
-
-            //ai
-            if (await handleSwipe()) return
-
-            //user
-            if (await handleUserMesEdit()) return
+            // const toVerify = []
+            // if (verifyInputs(toVerify) === false) {
+            //     await saveData()
+            //     return
+            // }
 
             //main func start here
 
-            //user
-            await updateJB()
 
-            //ai
-            await handleAIMesEdit()
 
-            await saveData()
+            kaplay({
+                width: 600,
+                height: 300,
+                background: "#93C9BC",
+            })
+
+            initCards()
+
+
+            // await saveData()
         })
     </script>
 </body>
