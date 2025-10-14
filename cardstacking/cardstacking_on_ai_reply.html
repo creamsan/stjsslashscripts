@@ -188,16 +188,15 @@
                 { name: "dog", img: "dog", rarity: "common" },
                 { name: "girl", img: "cute_little_girl_cute_dress", rarity: "rare" },
                 { name: "house", img: "house", rarity: "rare" },
-                { name: "bomb", img: "bomb", rarity: "dangerous"}
-            ],
-            combo: [
-                [],
-                [],
-                [],
-                [],
-                []
+                { name: "bomb", img: "bomb", rarity: "dangerous" },
+                { name: "combiner", img: "https://creazilla-store.fra1.digitaloceanspaces.com/icons/3516048/cog-icon-sm.png", rarity: "combiner" },
+                { name: "combiner2", img: "https://creazilla-store.fra1.digitaloceanspaces.com/icons/3516048/cog-icon-sm.png", rarity: "combiner" }
             ]
         }
+
+
+        const CARD_WIDTH = 70
+        const CARD_HEIGHT = 100
 
 
         function initCards() {
@@ -207,15 +206,18 @@
                 common: color(90, 196, 124),
                 rare: color(135, 62, 199),
                 legendary: color(230, 176, 28),
+                combiner: color(230, 230, 108)
             }
             sample.cards.forEach(card => {
                 const c = add([
-                    rect(70, 100),
+                    rect(CARD_WIDTH, CARD_HEIGHT),
                     area(),
+                    scale(1.25),
                     outline(1),
                     RARITY_COLORS[card.rarity],
-                    pos(rand(0, canvas.width / 2), rand(0, canvas.height)),
+                    pos(card.rarity === "combiner" ? rand(canvas.width / 2, canvas.width - 20) : rand(20, canvas.width / 2 - 50), rand(50, canvas.height - 50)),
                     anchor("center"),
+                    card.rarity === "combiner" ? "combiner" : "card",
                     "card",
                     z(0),
                     {
@@ -226,12 +228,13 @@
                     {
                         name: card.name,
                         img: card.img,
-                        rarity: card.rarity
+                        rarity: card.rarity === "combiner" ? "Place the cards you want to combine here." : card.rarity,
+                        attached: []
                     },
                 ])
 
                 //add pic
-                loadSprite(card.img, `https://image.pollinations.ai/prompt/${card.img}`)
+                loadSprite(card.img, card.rarity === "combiner" ? card.img : `https://image.pollinations.ai/prompt/pixiv_digital_art_${card.img}`)
                 c.add([
                     sprite(card.img, {
                         width: 64,
@@ -243,7 +246,9 @@
                     pos(-32, -40),
                     z(0),
                     {
-                        update() { this.z = c.pos.y; }
+                        update() {
+                            this.z = c.pos.y;
+                        }
                     },
                 ])
 
@@ -257,12 +262,13 @@
                 if (held.length > 0) {
                     return
                 }
+                let toDrag = hovered[0]
                 startDragPos = mousePos()
                 held.push(card.id)
-                const drag = onMouseMove(() => {
-                    newDragPos = startDragPos - mousePos()
+                const drag = onMouseMove(function () {
+                    newDragPos = mousePos().sub(startDragPos)
                     startDragPos = mousePos()
-                    card.pos = startDragPos
+                    toDrag.pos = toDrag.pos.add(newDragPos)
                 })
                 onMouseRelease("left", () => {
                     drag.cancel()
@@ -272,7 +278,7 @@
 
             //card hover
             const tooltip = add([
-                rect(150, 70),
+                rect(200, 70),
                 pos(1000, 1000),
                 color(107, 115, 108),
                 opacity(0.9),
@@ -280,26 +286,22 @@
                 {
                     update() {
                         if (this.hidden) {
-                            this.pos = vec2(1000)
+                            this.pos = vec2(canvas.height)
                         }
                         else {
                             this.pos = mousePos()
-                            this
                         }
                     }
                 },
-                "tooltip",
-                {
-                    nameTxt: "name",
-                    rarityTxt: "rarity"
-                }
+                "tooltip"
             ])
             const tooltipTxt = tooltip.add([
                 z(canvas.height + 1),
                 pos(5),
                 color(255, 255, 255),
                 text("", {
-                    size: 18
+                    size: 16,
+                    width: 190
                 }),
                 "tooltipText"
             ])
@@ -307,11 +309,11 @@
             let hovered = []
             onHover("card", function (card) {
                 hovered.push(card)
-                hovered = hovered.sort((a,b) => b.z - a.z)
+                hovered = hovered.sort((a, b) => b.z - a.z)
                 tooltipTxt.text = `${hovered[0].name}
 ${hovered[0].rarity}`
                 tooltip.hidden = false
-                tooltip.pos = mousePos() 
+                tooltip.pos = mousePos()
             })
             onHoverEnd("card", function (card) {
                 hovered = hovered.filter(c => c.id !== card.id)
@@ -324,6 +326,75 @@ ${hovered[0].rarity}`
                 tooltip.pos = vec2(canvas.width + 100, canvas.height + 100)
                 hovered = []
             })
+        }
+
+
+        let toCombine = []
+        let attached = []
+        let combinersPos = {}
+        function initCombiners() {
+            const combiners = get("combiner")
+            onMouseRelease("left", function () {
+                toCombine.forEach(element => {
+                    if (element.combinerObj.attached.includes(element.cardObj) === false) {
+                        element.combinerObj.attached.push(element.cardObj)
+                        const i = element.combinerObj.attached.length
+                        element.cardObj.pos = vec2(element.combinerObj.pos.x + (15 * i), element.combinerObj.pos.y + (15 * i))
+                    }
+                })
+                toCombine = []
+            })
+
+            onCollide("card", "combiner", function (card, combiner) {
+                if (card.is("combiner") && combiner.is("combiner")) {
+                    return
+                }
+                if(alreadyAttached(card)) {
+                    return
+                }
+                if (toCombine.filter(item => item.cardId === card.id).length > 0) {
+                    return
+                }
+                toCombine.push({
+                    combinerObj: combiner,
+                    cardObj: card
+                })
+            })
+
+            onCollideEnd("card", "combiner", function (card, combiner) {
+                combiner.attached = combiner.attached.filter(c => card !== c)
+            })
+
+            onUpdate("combiner", function (combiner) {
+                if (combinersPos[combiner.id] === combiner.pos) {
+                    return
+                }
+                combinersPos[combiner.id] = combiner.pos
+                combiner.attached.forEach((card, i) => {
+                    i += 1
+                    card.pos = vec2(combiner.pos.x + (15 * i), combiner.pos.y + (15 * i))
+                });
+            })
+        }
+
+
+        function alreadyAttached(card) {
+            const combiners = get("combiner")
+            for(const combiner of combiners) {
+                if(combiner.attached.includes(card)) {
+                    return true
+                }
+            }
+            return false
+        }
+
+
+        function setBG() {
+            loadSprite("bg", "https://images.unsplash.com/photo-1495422964407-28c01bf82b0d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMjA3fDB8MXxzZWFyY2h8MXx8Ymx1cnJ5JTIwYmFja2dyb3VuZHx8MHx8fHwxNjI3NzUyNTA3&ixlib=rb-1.2.1&q=80&w=1080")
+            add([
+                sprite("bg"),
+                z(-1)
+            ])
         }
 
 
@@ -358,15 +429,19 @@ ${hovered[0].rarity}`
 
 
             kaplay({
-                width: 600,
+                width: 650,
                 height: 300,
-                background: "#93C9BC",
             })
+
+            setBG()
 
             initCards()
 
+            initCombiners()
+
 
             // await saveData()
+            document.querySelector("body").style.height = "fit-content"
         })
     </script>
 </body>
