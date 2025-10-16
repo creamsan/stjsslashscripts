@@ -1,0 +1,268 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            margin: 0;
+            width: 100%;
+            height: fit-content;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+
+        canvas {
+            margin: 0 auto;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(184, 48, 48);
+        }
+
+        .stylized-button {
+            color: white;
+            padding: 3px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .stylized-button:hover {
+            transform: scale(1.05);
+        }
+
+        .stylized-button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not generate the expected output. Please swipe or regenerate. If this is the intro, you
+            should ignore this.
+        </div>
+        <button class="stylized-button" id="ignore_btn">Ignore</button>
+    </div>
+    <div id="main_cont"></div>
+
+    <script>
+        const main_cont = document.getElementById("main_cont")
+
+
+        let toJB
+        let gameOver
+        let userMesEdited
+        let cards
+        //let newCards
+        let chatData
+        //user side
+        function loadChatData() {
+            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+            toJB = chatData.toJB
+            gameOver = chatData.gameOver
+            userMesEdited = chatData.userMesEdited
+            //cards = chatData.cards
+            cards = chatData.newCards
+        }
+
+
+        async function saveData() {
+            chatData.toJB = toJB
+            chatData.gameOver = gameOver
+            chatData.userMesEdited = userMesEdited
+            chatData.cards = cards
+            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+        }
+
+
+        let chatMessages
+        async function loadChatMessages() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+        }
+
+
+
+        //user side
+        async function handleUserMesEdit() {
+            if (userMesEdited) {
+                main_cont.parentNode.removeChild(main_cont)
+                await saveData()
+                return true
+            }
+            userMesEdited = true
+            return false
+        }
+
+
+        //user side
+        async function updateJB() {
+            await insertOrAssignVariables({ jbout: toJB })
+            //toJB = ""
+        }
+
+
+        function triggerSpecialCards() {
+            switch (chatMessages.message_id) {
+                case 7:
+                case 15:
+                case 35:
+                    cards.push({ name: "Combiner", img: "combiner", rarity: "combiner", desc: "Place the cards you want to combine here." })
+            }
+
+            let userAlive = false
+            let toDestroyCount = 0
+            cards.forEach(card => {
+                switch (card.rarity) {
+                    case "user":
+                        userAlive = true
+                        break
+                    case "bomb":
+                        if (chatData.bombCooldown === undefined) {
+                            chatData.bombCooldown = 5
+                        }
+                        else {
+                            chatData.bombCooldown -= 1
+                        }
+                        break
+                    case "todestroy":
+                        if (chatData.hasDestroyGoal === undefined) {
+                            chatData.hasDestroyGoal = true
+                        }
+                        toDestroyCount++
+                        break
+                }
+            });
+
+            if (chatData.bombCooldown === 0) {
+                toJB = `- The bomb exploded. Everyone died. Game over.
+`
+                return false
+            }
+            if (toDestroyCount === 0 && chatData.hasDestroyGoal) {
+                toJB = `- Goal achieved. {{user}} destroyed every obstacle in his way. Game over.
+`
+                return false
+            }
+            if (userAlive === false) {
+                toJB = `- {{user}} is dead. Game over.
+`
+                return false
+            }
+
+            return true
+        }
+
+
+        //main
+        document.addEventListener("DOMContentLoaded", async function () {
+            //user
+            await loadChatData()
+
+            //user
+            if (await handleUserMesEdit()) return
+
+            await loadChatMessages()
+
+            //main func start here
+            if (gameOver) {
+                await updateJB()
+                await saveData()
+                return
+            }
+
+            if (triggerSpecialCards() === false) {
+                gameOver = true
+                toastr.info("Game over")
+                await updateJB()
+                await saveData()
+                return
+            }
+
+            toJB = `- Please include the following at the beginning of the next response:
+<result>
+[Function sequence here]
+</result>
+- Inside the result tags are functions that simulate the entities' reactions based on the existence and combinations of other entities.
+- Functions available are: add(name, imageDescription, rarity, flavorText, count) and remove(name)
+- Parameters:
+- name - a string. As much as possible, pass a noun only. Use imageDescription and flavorText params for descriptors and adjectives.
+- imageDescription - a string that vividly_describes_this_entity_separated_by_underscores.
+- rarity - a string that describes how rare this entity is. Rarities include: "junk", "common", "rare", "legendary", "dangerous" and "unique". Unique entities are one-of-a-kind and most likely have their own name.
+- flavorText - if the entity has something of note, then include a short single sentence flavor text. Otherwise leave an empty string ("").
+- count - defaults to 1, if multiple entity are created, specify an integer.
+
+- To use the functions: First, take a look at the combinations. Which entity will be added? Which one will be removed? Here's an example:
+- Combination 1:
+- Baseball Bat
+- Zombie
+- {{user}}
+
+- Depending on the context, {{user}} may be using the baseball bat to strike the zombie. However, the baseball bat is destroyed in the process. The function sequence may be:
+remove("Zombie") //remove the "Zombie". As much as possible, match the names.
+remove("Baseball Bat") //remove the baseball bat since it was destroyed when hitting the zombie
+add("Zombie Corpse", "bloody_zombie_corpse_lying_on_the_floor", "common", "") //add a zombie corpse entity
+
+- Combinations done. Next, take a look at the list of remaining entities. Which entity will be added? Which one will be removed? Here's an example:
+- Remaining entities:
+- Bob - Gluttonous bastard
+- Pie
+- Stone
+- Cake
+- Mana Potion
+
+- Keep it simple. Do whatever seems most interesting and funny and makes the most sense for the situation. In this case, since Bob is a glutton, he eats.
+remove("Pie") //Bob ate it
+remove("Cake") //Bob ate it
+add("Vomit", "puddle_of_yellowish_liquid_slop_on_the_ground", "unique", "Maybe this is the final ingredient for the potion you're making.") //Bob overate and vomits
+
+- Finally, add an entity to spice the story up: a random {{random: "junk","junk","junk","common","common","common","common","common","common","common","common","rare","legendary","unique","dangerous"}} entity. You should have gotten the hang of using the add function by now.
+
+- Briefing done. Here's the actual data. Keep it simple. First thoughts are the best thoughts:
+` + toJB
+
+            //user
+            await updateJB()
+            toJB = ""
+
+            await saveData()
+        })
+    </script>
+</body>
+
+</html>
+```

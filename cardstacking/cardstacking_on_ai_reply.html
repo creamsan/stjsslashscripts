@@ -82,7 +82,13 @@
     <div id="main_cont"></div>
 
     <script>
+        const webServerAddress = "http://127.0.0.1:8000"
         const main_cont = document.getElementById("main_cont")
+
+        kaplay({
+            width: 650,
+            height: 300,
+        })
         const game = document.querySelector("canvas")
 
 
@@ -93,6 +99,7 @@
             const errorIgnoreBtn = document.getElementById("ignore_btn")
             errorIgnoreBtn.addEventListener("click", function () {
                 main_cont.style.display = "flex"
+                game.style.display = "block"
                 error.style.display = "none"
             })
         }
@@ -111,11 +118,11 @@
 
         let toJB
         let gameOver
-        let swiped
-        let toCut
         let userMesEdited
-        let expectingOutputOnId
         let chatData
+        let cards
+        let swiped
+        let bg
         //ai side
         async function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
@@ -124,18 +131,19 @@
                 chatData = {}
                 toJB = ""
                 gameOver = false
-                swiped = false
-                toCut = true
-                expectingOutputOnId = false
                 userMesEdited = false
+                swiped = false
+                cards = []
+                bg = 0
             }
             else {
                 toJB = chatData.toJB
                 gameOver = chatData.gameOver
-                swiped = chatData.swiped
-                toCut = chatData.toCut
-                expectingOutputOnId = chatData.expectingOutputOnId
                 userMesEdited = false
+                swiped = chatData.swiped
+                cards = chatData.cards
+                newCards = [...cards]
+                bg = chatData.bg
             }
         }
 
@@ -143,81 +151,96 @@
         async function saveData() {
             chatData.toJB = toJB
             chatData.gameOver = gameOver
-            chatData.swiped = swiped
-            chatData.toCut = toCut
-            chatData.expectingOutputOnId = expectingOutputOnId
             chatData.userMesEdited = userMesEdited
+            chatData.cards = cards
+            chatData.newCards = newCards
+            chatData.swiped = swiped
+            chatData.bg = bg
             await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
 
         //ai side
-        function verifyInputs(toVerify) {
+        function verifyInputs() {
             if (gameOver) {
                 main_cont.parentNode.removeChild(main_cont)
+                game.style.display = "none"
                 return false
             }
 
             const mesId = chatMessages.message_id
 
-            if (expectingOutputOnId === mesId && input == "") {
+            if (mesId !== 0 && input == "") {
                 main_cont.style.display = "none"
+                game.style.display = "none"
                 error.style.display = "flex"
                 return false
-            }
-
-            for (const element of toVerify) {
-                if (expectingOutputOnId === mesId && element == "") {
-                    main_cont.style.display = "none"
-                    error.style.display = "flex"
-                    return false
-                }
-            }
-
-            if (mesId === 0 || expectingOutputOnId != mesId) {
-                main_cont.style.display = "none"
-                error.style.display = "none"
             }
 
             return true
         }
 
 
-        const sample = {
-            cards: [
-                { name: "dog", img: "dog", rarity: "common" },
-                { name: "girl", img: "cute_little_girl_cute_dress", rarity: "rare" },
-                { name: "house", img: "house", rarity: "rare" },
-                { name: "bomb", img: "bomb", rarity: "dangerous" },
-                { name: "combiner", img: "https://creazilla-store.fra1.digitaloceanspaces.com/icons/3516048/cog-icon-sm.png", rarity: "combiner" },
-                { name: "combiner2", img: "https://creazilla-store.fra1.digitaloceanspaces.com/icons/3516048/cog-icon-sm.png", rarity: "combiner" }
-            ]
-        }
-
-
         const CARD_WIDTH = 70
         const CARD_HEIGHT = 100
-
-
         function initCards() {
             const RARITY_COLORS = {
                 dangerous: color(212, 34, 34),
                 junk: color(160, 140, 108),
                 common: color(90, 196, 124),
                 rare: color(135, 62, 199),
-                legendary: color(230, 176, 28),
-                combiner: color(230, 230, 108)
+                legendary: color(247, 142, 22),
+                unique: color(235, 207, 87),
+                special: color(219, 119, 230),
             }
-            sample.cards.forEach(card => {
+
+            const getColor = (rarity) => {
+                switch (rarity) {
+                    case "bomb":
+                    case "dangerous":
+                    case "todestroy": return RARITY_COLORS.dangerous
+                    case "junk":
+                    case "common":
+                    case "rare":
+                    case "legendary":
+                    case "unique": return RARITY_COLORS[rarity]
+                    default: return RARITY_COLORS.special
+                }
+            }
+
+            const getTag = (rarity) => {
+                switch (rarity) {
+                    case "dangerous":
+                    case "junk":
+                    case "common":
+                    case "rare":
+                    case "legendary":
+                    case "unique": return "card"
+                    default: return rarity
+                }
+            }
+
+            const getSpritePath = (rarity, img) => {
+                switch (rarity) {
+                    case "combiner": return "https://creazilla-store.fra1.digitaloceanspaces.com/icons/3516048/cog-icon-sm.png"
+                    case "user":
+                        let path = `${webServerAddress}${"{{userAvatarPath}}".replace(/^./, "")}`
+                        path = path.replace(" ", "%20")
+                        return path
+                    default: return `https://image.pollinations.ai/prompt/digital_illustration_${img}`
+                }
+            }
+
+            newCards.forEach((card, i) => {
                 const c = add([
                     rect(CARD_WIDTH, CARD_HEIGHT),
                     area(),
                     scale(1.25),
                     outline(1),
-                    RARITY_COLORS[card.rarity],
-                    pos(card.rarity === "combiner" ? rand(canvas.width / 2, canvas.width - 20) : rand(20, canvas.width / 2 - 50), rand(50, canvas.height - 50)),
+                    getColor(card.rarity),
+                    pos(card.rarity === "combiner" ? rand(canvas.width - canvas.width * 0.25 + CARD_WIDTH * 0.5, canvas.width - CARD_WIDTH * 0.5) : rand(CARD_WIDTH * 0.5, canvas.width * 0.7 - CARD_WIDTH * 0.5), rand(CARD_HEIGHT * 0.5, canvas.height - CARD_HEIGHT * 0.5)),
                     anchor("center"),
-                    card.rarity === "combiner" ? "combiner" : "card",
+                    getTag(card.rarity),
                     "card",
                     z(0),
                     {
@@ -228,22 +251,20 @@
                     {
                         name: card.name,
                         img: card.img,
-                        rarity: card.rarity === "combiner" ? "Place the cards you want to combine here." : card.rarity,
+                        rarity: card.rarity,
+                        desc: card.desc,
                         attached: []
                     },
                 ])
 
                 //add pic
-                loadSprite(card.img, card.rarity === "combiner" ? card.img : `https://image.pollinations.ai/prompt/pixiv_digital_art_${card.img}`)
+                loadSprite(card.img, getSpritePath(card.rarity, card.img))
                 c.add([
                     sprite(card.img, {
                         width: 64,
-                        height: 64,
-                        fill: true,
+                        height: card.img === "{{user}}" ? 96 : 64
                     }),
-                    outline(1),
-                    color(255, 255, 255),
-                    pos(-32, -40),
+                    pos(-32, card.img === "{{user}}" ? -48 : -40),
                     z(0),
                     {
                         update() {
@@ -276,10 +297,12 @@
                 })
             })
 
+            const TOOLTIP_WIDTH = 300
+            const TOOLTIP_HEIGHT = 150
             //card hover
             const tooltip = add([
-                rect(200, 70),
-                pos(1000, 1000),
+                rect(TOOLTIP_WIDTH, TOOLTIP_HEIGHT),
+                pos(canvas.height),
                 color(107, 115, 108),
                 opacity(0.9),
                 z(canvas.height),
@@ -295,152 +318,418 @@
                 },
                 "tooltip"
             ])
+
             const tooltipTxt = tooltip.add([
                 z(canvas.height + 1),
                 pos(5),
                 color(255, 255, 255),
                 text("", {
                     size: 16,
-                    width: 190
+                    width: TOOLTIP_WIDTH - 10
                 }),
                 "tooltipText"
             ])
+
             tooltip.hidden = true
             let hovered = []
             onHover("card", function (card) {
                 hovered.push(card)
                 hovered = hovered.sort((a, b) => b.z - a.z)
                 tooltipTxt.text = `${hovered[0].name}
-${hovered[0].rarity}`
+${hovered[0].desc}`
                 tooltip.hidden = false
                 tooltip.pos = mousePos()
             })
+
             onHoverEnd("card", function (card) {
                 hovered = hovered.filter(c => c.id !== card.id)
                 if (hovered.length > 0) {
                     tooltipTxt.text = `${hovered[0].name}
-${hovered[0].rarity}`
+${hovered[0].desc}`
                     return
                 }
                 tooltip.hidden = true
-                tooltip.pos = vec2(canvas.width + 100, canvas.height + 100)
                 hovered = []
             })
         }
 
 
-        let toCombine = []
-        let attached = []
-        let combinersPos = {}
-        function initCombiners() {
+        function updateJB() {
+            toJB = ""
             const combiners = get("combiner")
-            onMouseRelease("left", function () {
-                toCombine.forEach(element => {
-                    if (element.combinerObj.attached.includes(element.cardObj) === false) {
-                        element.combinerObj.attached.push(element.cardObj)
-                        const i = element.combinerObj.attached.length
-                        element.cardObj.pos = vec2(element.combinerObj.pos.x + (15 * i), element.combinerObj.pos.y + (15 * i))
+            let attached = []
+            combiners.forEach((combiner, i) => {
+                toJB = `- Combination ${i + 1}:
+`
+                combiner.attached.forEach(c => {
+                    let desc = element.desc
+                    if (element.rarity === "user") {
+                        desc = ""
                     }
-                })
-                toCombine = []
+                    toJB += `- ${element.name}${desc === "" ? "" : " - " + desc}
+`
+                    attached.push(c.id)
+                });
+            });
+
+            let listC = get("card")
+            listC = listC.filter(c => attached.includes(c.id) === false)
+            toJB += `- Remaining entities:
+`
+            listC.forEach(element => {
+                if (element.rarity === "combiner") {
+                    return
+                }
+                let desc = element.desc
+                if (element.rarity === "user") {
+                    desc = ""
+                }
+                toJB += `- ${element.name}${desc === "" ? "" : " - " + desc}
+`
+            });
+
+            chatData.toJB = toJB
+            triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+        }
+
+
+        let actQueue = []
+        let combinersPos = {}
+        const MAX_COMBINE_LIMIT = 3
+        function initCombiners() {
+            onMouseRelease("left", function () {
+                while (actQueue.length > 0) {
+                    const entry = actQueue.shift()
+                    if (entry.action === "attach") {
+                        if (entry.combiner.attached.length >= MAX_COMBINE_LIMIT) {
+                            debug.log(`Can't combine more than ${MAX_COMBINE_LIMIT} cards.`)
+                            continue
+                        }
+                        detachAll(entry.card)
+                        entry.combiner.attached.push(entry.card)
+                    }
+                    else {
+                        entry.combiner.attached = entry.combiner.attached.filter(c => c.id != entry.card.id)
+                    }
+                    refreshAttached(entry.combiner)
+                    updateJB()
+                }
             })
 
             onCollide("card", "combiner", function (card, combiner) {
+                const combinerId = combiner.id
                 if (card.is("combiner") && combiner.is("combiner")) {
                     return
                 }
-                if(alreadyAttached(card)) {
-                    return
+                const entry = actQueue.filter(e => e.action === "attach" && e.card.id == card.id)
+                if (entry.length > 0) {
+                    actQueue = actQueue.filter(e => e.action === "attach" && e.card.id != card.id)
                 }
-                if (toCombine.filter(item => item.cardId === card.id).length > 0) {
-                    return
-                }
-                toCombine.push({
-                    combinerObj: combiner,
-                    cardObj: card
+                actQueue.push({
+                    combiner: combiner,
+                    card: card,
+                    action: "attach"
                 })
             })
 
             onCollideEnd("card", "combiner", function (card, combiner) {
-                combiner.attached = combiner.attached.filter(c => card !== c)
+                const combinerId = combiner.id
+                if (card.is("combiner") && combiner.is("combiner")) {
+                    return
+                }
+                const entry = actQueue.filter(e => e.action === "detach" && e.combiner.id == combiner.id && e.card.id == card.id)
+                if (entry.length > 0) {
+                    actQueue = actQueue.filter(e => e.action === "detach" && e.combiner.id != combiner.id && e.card.id != card.id)
+                }
+                const aEntry = actQueue.filter(e => e.action === "attach" && e.combiner.id == combiner.id && e.card.id == card.id)
+                if (aEntry.length > 0) {
+                    actQueue = actQueue.filter(e => e.action === "attach" && e.combiner.id != combiner.id && e.card.id != card.id)
+                    return
+                }
+                actQueue.push({
+                    combiner: combiner,
+                    card: card,
+                    action: "detach"
+                })
             })
 
             onUpdate("combiner", function (combiner) {
-                if (combinersPos[combiner.id] === combiner.pos) {
+                if (combinersPos[combiner.id] == combiner.pos) {
                     return
                 }
                 combinersPos[combiner.id] = combiner.pos
-                combiner.attached.forEach((card, i) => {
-                    i += 1
-                    card.pos = vec2(combiner.pos.x + (15 * i), combiner.pos.y + (15 * i))
-                });
+                refreshAttached(combiner)
             })
         }
 
 
-        function alreadyAttached(card) {
-            const combiners = get("combiner")
-            for(const combiner of combiners) {
-                if(combiner.attached.includes(card)) {
-                    return true
-                }
+        function refreshAttached(combiner) {
+            let i = 0
+            for (const card of combiner.attached) {
+                i++
+                card.pos = vec2(combiner.pos.x + (15 * i), combiner.pos.y + (15 * i))
             }
-            return false
         }
 
 
-        function setBG() {
-            loadSprite("bg", "https://images.unsplash.com/photo-1495422964407-28c01bf82b0d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMjA3fDB8MXxzZWFyY2h8MXx8Ymx1cnJ5JTIwYmFja2dyb3VuZHx8MHx8fHwxNjI3NzUyNTA3&ixlib=rb-1.2.1&q=80&w=1080")
+        function detachAll(card) {
+            const combiners = get("combiner")
+            combiners.forEach(combiner => {
+                combiner.attached = combiner.attached.filter(c => card.id != c.id)
+            });
+        }
+
+
+        function setBG(url) {
+            loadSprite("bg", url)
             add([
-                sprite("bg"),
+                sprite("bg", {
+                    width: 650,
+                    height: 300,
+                }),
                 z(-1)
             ])
         }
 
 
+        let newCards = []
+        async function parseCommands(commands) {
+            const regexAdd = /add/i
+            const regexAddName = /(?<=add\(("[\S\s]+?",\s*){0}")[\S\s]+?(?=",|"\))/i
+            const regexAddImg = /(?<=add\(("[\S\s]+?",\s*){1}")[\S\s]+?(?=",|"\))/i
+            const regexAddRarity = /(?<=add\(("[\S\s]+?",\s*){2}")[\S\s]+?(?=",|"\))/i
+            const regexAddDesc = /(?<=add\(("[\S\s]+?",\s*){3}")[\S\s]+?(?=",|"\))/i
+            const regexAddCount = /(?<=add\(("[\S\s]+?",\s*){4})[\d]+?(?=\))/i
+            const regexRemoveName = /(?<=remove\(")[\S\s]+?(?="\))/i
+            for (const com of commands) {
+                const commandStr = com[0]
+                if (regexAdd.test(commandStr)) {
+                    //add
+                    const name = regexAddName.test(commandStr) ? commandStr.match(regexAddName)[0] : ""
+                    const img = regexAddImg.test(commandStr) ? commandStr.match(regexAddImg)[0] : ""
+                    const rarity = regexAddRarity.test(commandStr) ? commandStr.match(regexAddRarity)[0] : ""
+                    const desc = regexAddDesc.test(commandStr) ? commandStr.match(regexAddDesc)[0] : ""
+                    const count = regexAddCount.test(commandStr) ? Number.parseInt(commandStr.match(regexAddCount)[0]) : 1
+                    if (verifyCommandInputs([name, img, rarity, count]) === false) {
+                        continue
+                    }
+                    for (let i = 0; i < count; i++) {
+                        if (rarity === "unique" && newCards.filter(c => c.name === name).length > 0) {
+                            //remove existing unique with same name
+                            newCards = newCards.filter(c => c.name !== name)
+                        }
+                        newCards.push({
+                            name: name,
+                            img: img,
+                            rarity: rarity,
+                            desc: desc
+                        })
+                    }
+                }
+                else {
+                    //remove
+                    const name = regexRemoveName.test(commandStr) ? commandStr.match(regexRemoveName)[0] : ""
+                    if (name !== "") {
+                        const index = newCards.findIndex(obj => obj.name === name);
+                        if (index !== -1) {
+                            newCards.splice(index, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+
+        function verifyCommandInputs(inputs) {
+            for (const inp of inputs) {
+                if (inp === "") return false
+            }
+            return true
+        }
+
+
+        let crew = ["todestroy", "todestroy", "dangerous", "dangerous", "dangerous", "dangerous", "dangerous"]
+        function shuffleImposters() {
+            for (let i = crew.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1)); // Random index
+                [crew[i], crew[j]] = [crew[j], crew[i]]; // Swap elements
+            }
+
+            let intro4Arr = introCards[4]
+            let i = 0
+            intro4Arr.forEach(element => {
+                if (element.rarity === "") {
+                    element.rarity = crew[i]
+                    i++
+                }
+            });
+        }
+
+
+        const introCards = [
+            [
+                //0 alchemy
+                { name: "{{user}}", img: "{{user}}", rarity: "user", desc: "You. Keep this card alive." },
+                { name: "Renna", img: "young_female_elf_fantasy_setting", rarity: "unique", desc: "An elf who is training to become an alchemist." },
+                { name: "Yellow Potion", img: "sparkling_yellow_potion", rarity: "rare", desc: "" },
+                { name: "Catalyst", img: "crystallized_bottle_with_orange_liquid", rarity: "rare", desc: "" },
+                { name: "Red Potion", img: "sparkling_red_potion", rarity: "rare", desc: "" },
+                { name: "Mushrooms", img: "mushrooms", rarity: "common", desc: "" },
+                { name: "Herbs", img: "herbs", rarity: "common", desc: "" },
+                { name: "Combiner", img: "combiner", rarity: "combiner", desc: "Place the cards you want to combine here." },
+            ],
+            [
+                //1 stranded on an island
+                { name: "Megan", img: "female_messy_hair_upset", rarity: "unique", desc: "Shipwreck survivor. Megan has been in a terrible mood ever since the shipwreck." },
+                { name: "Anna", img: "little_girl_cute_dress_smile", rarity: "unique", desc: "Shipwreck survivor. Despite being a kid, Anna seems optimistic." },
+                { name: "Coconut Tree", img: "coconut_tree_tall", rarity: "common", desc: "" },
+                { name: "{{user}}", img: "{{user}}", rarity: "user", desc: "You. Keep this card alive." },
+                { name: "Medkit", img: "medkit_containing_medicinal_supplies", rarity: "rare", desc: "" },
+                { name: "Shovel", img: "shovel", rarity: "rare", desc: "" },
+                { name: "Ration", img: "wrapped_food_ration", rarity: "rare", desc: "" },
+                { name: "Ration", img: "wrapped_food_ration", rarity: "rare", desc: "" },
+                { name: "Stone", img: "stone", rarity: "junk", desc: "" },
+                { name: "Stone", img: "stone", rarity: "junk", desc: "" },
+                { name: "Combiner", img: "combiner", rarity: "combiner", desc: "Place the cards you want to combine here." },
+            ],
+            [
+                //2 prison
+                { name: "Prison Wall", img: "prison_cell_bars", rarity: "todestroy", desc: "{{user}} cannot escape until the prison wall is destroyed." },
+                { name: "Bar of Soap", img: "bar_of_soap", rarity: "common", desc: "" },
+                { name: "Warden Gonzales", img: "male_police_officer_with_mustache_frowning", rarity: "unique", desc: "A bully and a snob. He uses excessive force against prisoners." },
+                { name: "{{user}}", img: "{{user}}", rarity: "user", desc: "You. Keep this card alive." },
+                { name: "Warden Lani", img: "female_police_officer_menacing_smile", rarity: "unique", desc: "An ordinary policewoman. There's nothing special about her." },
+                { name: "Shiv", img: "a_very_sharp_metallic_shiv", rarity: "rare", desc: "" },
+                { name: "Prisoner Fineg", img: "man_in_prisoner_outfit_wearing_glasses_grinning", rarity: "unique", desc: "Incarcerated on charges of child abuse." },
+                { name: "Prisoner Tyrone", img: "bald_man_in_prisoner_outfit_muscles_african_american", rarity: "unique", desc: "Jailed for sexual assault." },
+                { name: "Prisoner Jamila", img: "woman_in_prisoner_outfit_slim_tattoo_frowning", rarity: "unique", desc: "A scam artist who was caught in a sting operation." },
+                { name: "Prisoner Old Jones", img: "old_man_in_prisoner_outfit_long_beard_bald", rarity: "unique", desc: "Indicted for multiple counts of first-degree murder." },
+                { name: "Combiner", img: "combiner", rarity: "combiner", desc: "Place the cards you want to combine here." },
+            ],
+            [
+                //3 defuse the bomb
+                { name: "Time Bomb", img: "time_bomb_with_various_electronics_wires_and_digital_timer", rarity: "bomb", desc: "Defuse the bomb or everyone dies." },
+                { name: "{{user}}", img: "{{user}}", rarity: "user", desc: "You. Keep this card alive." },
+                { name: "Flor", img: "female_in_office_uniform", rarity: "unique", desc: "A regular office lady who works in the HR department." },
+                { name: "Combiner", img: "combiner", rarity: "combiner", desc: "Place the cards you want to combine here." },
+            ],
+            [
+                //4 imposters in space station
+                { name: "{{user}}", img: "{{user}}", rarity: "user", desc: "You. Keep this card alive." },
+                { name: "Crewmate Red", img: "astronaut_in_red_spacesuit", rarity: "", desc: "Fellow crew member" },
+                { name: "Crewmate Orange", img: "astronaut_in_orange_spacesuit", rarity: "", desc: "Fellow crew member" },
+                { name: "Crewmate Yellow", img: "astronaut_in_yellow_spacesuit", rarity: "", desc: "Fellow crew member" },
+                { name: "Crewmate Green", img: "astronaut_in_green_spacesuit", rarity: "", desc: "Fellow crew member" },
+                { name: "Crewmate Blue", img: "astronaut_in_blue_spacesuit", rarity: "", desc: "Fellow crew member" },
+                { name: "Crewmate Pink", img: "astronaut_in_pink_spacesuit", rarity: "", desc: "Fellow crew member" },
+                { name: "Crewmate Purple", img: "astronaut_in_purple_spacesuit", rarity: "", desc: "Fellow crew member" },
+                { name: "Corpse of Crewmate Grey", img: "astronaut_in_grey_spacesuit_lying_on_the_floor_dead", rarity: "unique", desc: "He's dead. An imposter killed him." },
+                { name: "Fire Axe", img: "fire_axe", rarity: "common", desc: "" },
+                { name: "Pistol", img: "pistol", rarity: "rare", desc: "" },
+                { name: "Crowbar", img: "crowbar", rarity: "common", desc: "" },
+                { name: "Wrench", img: "wrench", rarity: "common", desc: "" },
+                { name: "Faulty Machinery", img: "faulty_machinery_broken_electronics_sparking_3", rarity: "unique", desc: "It needs to be fixed." },
+                { name: "Faulty Machinery", img: "faulty_machinery_broken_electronics_sparking_4", rarity: "unique", desc: "It needs to be fixed." },
+                { name: "Faulty Machinery", img: "faulty_machinery_broken_electronics_sparking_5", rarity: "unique", desc: "It needs to be fixed." },
+                { name: "Combiner", img: "combiner", rarity: "combiner", desc: "Place the cards you want to combine here." },
+            ],
+            [
+                //5 ritual
+                { name: "{{user}}", img: "{{user}}", rarity: "user", desc: "You. Keep this card alive." },
+                { name: "Mandy", img: "goth_girl_creepy_smile", rarity: "unique", desc: "A crazy girl who's into occult stuff." },
+                { name: "Necronomicon", img: "the_book_necronomicon_creepy_face_on_the_cover", rarity: "legendary", desc: "" },
+                { name: "Ritual Circle", img: "ritual_circle_drawn_on_the_floor", rarity: "rare", desc: "" },
+                { name: "Human Heart", img: "biology_internal_organ_human_heart", rarity: "rare", desc: "" },
+                { name: "Candle", img: "lit_up_candle", rarity: "common", desc: "" },
+                { name: "Candle", img: "lit_up_candle", rarity: "common", desc: "" },
+                { name: "Candle", img: "lit_up_candle", rarity: "common", desc: "" },
+                { name: "Knife", img: "a_sharp_knife", rarity: "common", desc: "" },
+                { name: "Combiner", img: "combiner", rarity: "combiner", desc: "Place the cards you want to combine here." },
+            ],
+        ]
+
+        const introBG = [
+            "https://files.catbox.moe/bymqxt.jpg",
+
+            "https://images.ctfassets.net/ql4dheqoo9gp/3VCbirMs7dx006dE2HEo2Q/b0be53f4e8111cc166659eb0d77804c2/standard.png",
+
+            "https://as1.ftcdn.net/v2/jpg/01/03/82/80/1000_F_103828083_8l1byXyqha0AaEkQXYYwKhzyxqHjMfcK.jpg",
+
+            "https://www.databankimx.com/wp-content/uploads/2022/07/iStock-1313115119.jpg",
+
+            "https://files.catbox.moe/urgops.jpg",
+
+            "https://as1.ftcdn.net/v2/jpg/03/46/36/52/1000_F_346365251_6Ei4WAsrLXutw39QpAcibcsDhtX8kZph.jpg"
+        ]
+
+
+        //user, bomb, todestroy
+        function triggerSpecialCards() {
+            let userAlive = false
+            let toDestroyCount = 0
+            newCards.forEach(card => {
+                switch (card.rarity) {
+                    case "user":
+                        userAlive = true
+                        break
+                }
+            });
+
+            if (userAlive === false) {
+                toJB = `- {{user}} is dead. Game over.
+`
+                return false
+            }
+
+            return true
+        }
+
+
+        //card - { name: "Dog", img: "dog", rarity: "common", desc: "description" },
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             //ai
-            //initError()
-            //await loadAIReply()
+            initError()
+            await loadAIReply()
 
             //ai user
-            //await loadChatData()
+            await loadChatData()
 
             //ai
             //intro handler - for multi intro cards
-            // if (chatMessages.message_id === 0) {
-
-            // }
+            if (chatMessages.message_id === 0) {
+                if (chatMessages.swipe_id === 4) {
+                    shuffleImposters()
+                }
+                newCards = [...introCards[chatMessages.swipe_id]]
+                bg = chatMessages.swipe_id
+            }
 
             //ai
             //regexes here
-            // const regexVar = /regex/i
-            // const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
+            const regexCommands = /(remove|add)\([^\n]+?\)/ig
+            const commands = regexCommands.test(input) ? input.matchAll(regexCommands) : ""
 
-            // const toVerify = []
-            // if (verifyInputs(toVerify) === false) {
-            //     await saveData()
-            //     return
-            // }
+            if (verifyInputs() === false) {
+                await saveData()
+                return
+            }
 
             //main func start here
+            await parseCommands(commands)
 
+            if (triggerSpecialCards() === false) {
+                gameOver = true
+                toastr.info("Game over")
+                await saveData()
+                return
+            }
 
-
-            kaplay({
-                width: 650,
-                height: 300,
-            })
-
-            setBG()
-
+            setBG(introBG[bg])
             initCards()
-
             initCombiners()
 
-
-            // await saveData()
+            await saveData()
             document.querySelector("body").style.height = "fit-content"
         })
     </script>

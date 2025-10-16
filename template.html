@@ -107,6 +107,11 @@
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
 
+        //user side
+        async function loadChatMessages() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+        }
+
 
         let toJB
         let gameOver
@@ -281,6 +286,9 @@ ${origInput}
 
             //user
             if (await handleUserMesEdit()) return
+
+            //user
+            await loadChatMessages()
 
             //main func start here
 
