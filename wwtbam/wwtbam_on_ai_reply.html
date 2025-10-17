@@ -164,7 +164,7 @@
             <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
         <div id="error_msg">
-            The AI did not generate the expected output. Please swipe/regenerate.
+            The AI did not generate the expected output. Please swipe/regenerate. If you are currently using the Phone Lifeline, ignore this message.
         </div>
         <button id="ignore_btn">Ignore</button>
     </div>
@@ -216,13 +216,14 @@
 
 
             //load/init data
-            const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
-            let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+            const chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            let input = chatMessages["swipes"][chatMessages["swipe_id"]]
             const regexInput = /<question>([\S\s](?!<question>))+?<\/question>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
 
 
-            let chatData = `{{getvar::chatData}}`
+            let chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            let chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id-1]
             let gameOver
             let winnings
             let currQuestion
@@ -234,8 +235,9 @@
             let questionExpected
             let toJB
             let userMesEdited
-            if (chatData == "") {
-                triggerSlash(`/setvar key=chatData {}`)
+            if (chatData == null) {
+                chatData = {}
+                chatDataHist = {}
                 gameOver = false
                 winnings = 0
                 currQuestion = 0
@@ -249,7 +251,6 @@
                 userMesEdited = false
             }
             else {
-                chatData = JSON.parse(getVariables()["chatData"])
                 gameOver = chatData["gameOver"]
                 winnings = chatData["winnings"]
                 currQuestion = chatData["currQuestion"]
@@ -279,7 +280,8 @@
                     "toJB": toJB,
                     "userMesEdited": userMesEdited
                 }
-                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+                chatDataHist[chatMessages.message_id] = chatData
+                triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
             }
 
 
@@ -309,7 +311,7 @@
                     return
                 }
             }
-            if (newGenSwipes["message_id"] === 0 || questionExpected === false) {
+            if (chatMessages["message_id"] === 0 || questionExpected === false) {
                 main_cont.style.display = "none"
                 error.style.display = "none"
             }
@@ -393,7 +395,7 @@
                     }
                     return
                 }
-                element.addEventListener("click", async function () {
+                element.addEventListener("click", function () {
                     if (unclickables.includes(element.id)) {
                         return
                     }
@@ -480,7 +482,7 @@
             })
 
 
-            async function initChoiceButton(e, elem) {
+            function initChoiceButton(e, elem) {
                 let isCorrect = false
                 let selected
                 switch (elem.id) {
@@ -521,14 +523,15 @@
                 const a = "{{"
                 const b = "input"
                 const c = "}}"
-                if(`${a+b+c}` == "") {
-                    await triggerSlash(`/send ... |
-                        /setinput {{noop}} | /trigger`)
-                }
-                else {
-                    await triggerSlash(`/send ${a+b+c} |
-                        /setinput {{noop}} | /trigger`)
-                }
+                triggerSlash(`
+                    /pass ${a}${b}${c} |
+                    /if left={{pipe}} right={{noop}} rule=eq else={:
+                        /send ${a}${b}${c}
+                    :}
+                    {:
+                        /send ...
+                    :} |
+                    /setinput {{noop}} | /trigger`)
 
                 saveData()
             }

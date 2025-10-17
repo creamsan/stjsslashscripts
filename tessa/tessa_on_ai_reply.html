@@ -150,7 +150,7 @@
 
             //load chatdata
             let toJB = ""
-            let chatData = `{{getvar::chatData}}`
+            let chatData = getVariables().chatData == null ? null : JSON.parse(getVariables()["chatData"])
             let options
             let combinations
             let expectingOutput
@@ -158,9 +158,10 @@
             let prevSelect2
             let userMesEdited
             let newElement
-            if (chatData == "") {
-                triggerSlash(`/setvar key=chatData {} | /setvar key=herdesc Tessa is invisible. Only her sweet, cheerful voice can be heard. She comments on new creations with casual, easy conversation. She is adaptable and comfortable talking about anything. No matter how weird, lewd, or uncomfortable it may be. Though her motives are unclear, Tessa hints at a mysterious goal. She will reveal it in time.`)
+            if (chatData == null) {
+                triggerSlash(`/setvar key=herdesc Tessa is invisible. Only her sweet, cheerful voice can be heard. She comments on new creations with casual, easy conversation. She is adaptable and comfortable talking about anything. No matter how weird, lewd, or uncomfortable it may be. Though her motives are unclear, Tessa hints at a mysterious goal. She will reveal it in time.`)
                 options = ["Select an element", "Fire", "Water", "Earth", "Air", "Force", "Time"]
+                chatData = {}
                 combinations = {}
                 expectingOutput = false
                 prevSelect1 = ""
@@ -169,7 +170,6 @@
                 userMesEdited = false
             }
             else {
-                chatData = JSON.parse(getVariables()["chatData"])
                 options = chatData["options"]
                 combinations = chatData["combinations"]
                 expectingOutput = chatData["expectingOutput"]

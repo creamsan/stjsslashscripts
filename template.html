@@ -106,7 +106,6 @@
             const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
-
         //user side
         async function loadChatMessages() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
@@ -120,12 +119,14 @@
         let userMesEdited
         let expectingOutputOnId
         let chatData
+        let chatDataHist
         //ai side
-        async function loadChatData() {
-            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+        function loadChatData() {
+            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id-1]
             if (chatData == null) {
-                await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
+                chatDataHist = {}
                 toJB = ""
                 gameOver = false
                 swiped = false
@@ -142,10 +143,10 @@
                 userMesEdited = false
             }
         }
-
         //user side
         function loadChatData() {
-            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist[chatMessages.message_id-1]
             toJB = chatData.toJB
             gameOver = chatData.gameOver
             swiped = chatData.swiped
@@ -154,6 +155,8 @@
             userMesEdited = chatData.userMesEdited
         }
 
+
+        const MAX_CHATDATA_HISTORY = 20
         async function saveData() {
             chatData.toJB = toJB
             chatData.gameOver = gameOver
@@ -161,7 +164,15 @@
             chatData.toCut = toCut
             chatData.expectingOutputOnId = expectingOutputOnId
             chatData.userMesEdited = userMesEdited
-            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            chatDataHist[chatMessages.message_id] = chatData
+            const keys = Object.keys(chatDataHist)
+            const diff = keys.length - MAX_CHATDATA_HISTORY
+            if(keys.length > MAX_CHATDATA_HISTORY) {
+                for(let i = 0; i < diff; i++) {
+                    delete chatDataHist[keys[i]]
+                }
+            }
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
         }
 
 
@@ -262,7 +273,7 @@ ${origInput}
             await loadAIReply()
 
             //ai user
-            await loadChatData()
+            loadChatData()
 
             //ai
             //intro handler - for multi intro cards

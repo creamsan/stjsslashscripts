@@ -147,10 +147,9 @@
         let expectingOutputOnId
         let chatData
         //ai side
-        async function loadChatData() {
+        function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
             if (chatData == null) {
-                await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
                 toJB = ""
                 gameOver = false
@@ -586,7 +585,7 @@
             //await loadAIReply()
 
             //ai user
-            //await loadChatData()
+            //loadChatData()
 
             //ai
             //intro handler - for multi intro cards

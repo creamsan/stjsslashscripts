@@ -794,14 +794,16 @@
         let gameOver
         let userMesEdited
         let chatData
+        let chatDataHist
         let cooldown
         let expectingOutput
         let pause = false
-        async function loadChatData() {
-            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+        function loadChatData() {
+            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id - 1]
             if (chatData == null) {
-                await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
+                chatDataHist = {}
                 toJB = ""
                 gameOver = false
                 userMesEdited = false
@@ -832,7 +834,8 @@
             chatData.expectingOutput = expectingOutput
             chatData.cooldown = cooldown
             chatData.pokerData = poker.toJSON()
-            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            chatDataHist[chatMessages.message_id] = chatData
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
         }
 
 
@@ -1239,7 +1242,7 @@
             initError()
 
             await loadAIReply()
-            await loadChatData()
+            loadChatData()
 
             //regexes here
             const regexAIMove = /(?<=<move>\s+)[\S\s]+?(?=\s+<\/move>)/i
@@ -1252,7 +1255,7 @@
             }
 
             //buttons
-            exchangeBtn.addEventListener("click", async function () {
+            exchangeBtn.addEventListener("click", function () {
                 pause = true
                 toJB += `- {{user}} discarded ${p1ToExchange.length} cards.
 `
@@ -1272,21 +1275,22 @@
 
                 showCardsToExchange(p1.hand)
                 nextPokerPhase()
-                await saveData()
+                saveData()
                 const a = "{{"
                 const b = "input"
                 const c = "}}"
-                if (`${a + b + c}` == "") {
-                    await triggerSlash(`/send ... |
-                        /setinput {{noop}} | /trigger`)
-                }
-                else {
-                    await triggerSlash(`/send ${a + b + c} |
-                        /setinput {{noop}} | /trigger`)
-                }
+                triggerSlash(`
+                    /pass ${a}${b}${c} |
+                    /if left={{pipe}} right={{noop}} rule=eq else={:
+                        /send ${a}${b}${c}
+                    :}
+                    {:
+                        /send ...
+                    :} |
+                    /setinput {{noop}} | /trigger`)
                 main_cont.style.display = "none"
             })
-            continueBtn.addEventListener("click", async function () {
+            continueBtn.addEventListener("click", function () {
                 Object.keys(p1.clothes).forEach(c => {
                     if (p1.bank <= p1.clothes[c]) {
                         toJB += `- After the last game, {{user}} must take off his ${c}.
@@ -1305,18 +1309,19 @@
                 expectingOutput = false
                 cooldown = 1
                 if (gameOver === false) nextPokerPhase()
-                await saveData()
+                saveData()
                 const a = "{{"
                 const b = "input"
                 const c = "}}"
-                if (`${a + b + c}` == "") {
-                    await triggerSlash(`/send ... |
-                        /setinput {{noop}} | /trigger`)
-                }
-                else {
-                    await triggerSlash(`/send ${a + b + c} |
-                        /setinput {{noop}} | /trigger`)
-                }
+                triggerSlash(`
+                    /pass ${a}${b}${c} |
+                    /if left={{pipe}} right={{noop}} rule=eq else={:
+                        /send ${a}${b}${c}
+                    :}
+                    {:
+                        /send ...
+                    :} |
+                    /setinput {{noop}} | /trigger`)
                 main_cont.style.display = "none"
             })
             p1Call.addEventListener("click", function () {

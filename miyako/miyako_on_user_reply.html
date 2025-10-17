@@ -33,31 +33,60 @@
     <div id="main_cont"></div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const main_cont = document.getElementById("main_cont")
-            main_cont.parentNode.removeChild(main_cont)
+        const MAX_CHATDATA_HISTORY = 20
+        let chatMessages
+        async function loadChatMessages() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+        }
 
+
+        let chatDataHist
+        let chatData
+        let totalRating
+        let rating
+        let gameOver
+        let userMesEdited
+        async function saveData() {
+            chatData.totalRating = totalRating
+            chatData.gameOver = gameOver
+            chatData.userMesEdited = userMesEdited
+            chatDataHist[chatMessages.message_id] = chatData
+            const keys = Object.keys(chatDataHist)
+            const diff = keys.length - MAX_CHATDATA_HISTORY
+            if(keys.length > MAX_CHATDATA_HISTORY) {
+                for(let i = 0; i < diff; i++) {
+                    delete chatDataHist[keys[i]]
+                }
+            }
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
+        }
+
+
+        document.addEventListener("DOMContentLoaded", async function () {
+            const main_cont = document.getElementById("main_cont")
+
+            await loadChatMessages()
 
             //load chatdata
-            let chatData = JSON.parse(getVariables()["chatData"])
-            let totalRating = chatData["totalRating"]
-            let rating = chatData["rating"]
-            let gameOver = chatData["gameOver"]
-            let userMesEdited = chatData["userMesEdited"]
+            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist[chatMessages.message_id - 1]
+            totalRating = chatData.totalRating
+            rating = chatData.rating
+            gameOver = chatData.gameOver
+            userMesEdited = chatData.userMesEdited
 
 
             //edit handler - user side
-            if(userMesEdited) {
+            if (userMesEdited) {
                 main_cont.parentNode.removeChild(main_cont)
-                saveData()
+                await saveData()
                 return
             }
             userMesEdited = true
 
-
             //main script func here
-            if(rating.length > 0) {
-                if(rating === "no") {
+            if (rating.length > 0) {
+                if (rating === "no") {
                     totalRating += 1
                 }
                 else {
@@ -67,16 +96,7 @@
             totalRating = Math.max(-1, totalRating)
             totalRating = Math.min(11, totalRating)
 
-
-            saveData()
-
-
-            function saveData() {
-                chatData["totalRating"] = totalRating
-                chatData["gameOver"] = gameOver
-                chatData["userMesEdited"] = userMesEdited
-                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
-            }
+            await saveData()
         })
     </script>
 </body>

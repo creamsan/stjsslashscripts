@@ -120,15 +120,17 @@
         let gameOver
         let userMesEdited
         let chatData
+        let chatDataHist
         let cards
         let swiped
         let bg
         //ai side
-        async function loadChatData() {
-            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+        function loadChatData() {
+            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id-1]
             if (chatData == null) {
-                await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
+                chatDataHist = {}
                 toJB = ""
                 gameOver = false
                 userMesEdited = false
@@ -141,8 +143,7 @@
                 gameOver = chatData.gameOver
                 userMesEdited = false
                 swiped = chatData.swiped
-                cards = chatData.cards
-                newCards = [...cards]
+                newCards = [...chatData.cards]
                 bg = chatData.bg
             }
         }
@@ -152,16 +153,16 @@
             chatData.toJB = toJB
             chatData.gameOver = gameOver
             chatData.userMesEdited = userMesEdited
-            chatData.cards = cards
             chatData.newCards = newCards
             chatData.swiped = swiped
             chatData.bg = bg
-            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            chatDataHist[chatMessages.message_id] = chatData
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
         }
 
 
         //ai side
-        function verifyInputs() {
+        function verifyInputs(toVerify) {
             if (gameOver) {
                 main_cont.parentNode.removeChild(main_cont)
                 game.style.display = "none"
@@ -170,7 +171,7 @@
 
             const mesId = chatMessages.message_id
 
-            if (mesId !== 0 && input == "") {
+            if (mesId !== 0 && (input == "" || toVerify == "")) {
                 main_cont.style.display = "none"
                 game.style.display = "none"
                 error.style.display = "flex"
@@ -361,14 +362,14 @@ ${hovered[0].desc}`
             combiners.forEach((combiner, i) => {
                 toJB = `- Combination ${i + 1}:
 `
-                combiner.attached.forEach(c => {
+                combiner.attached.forEach(element => {
                     let desc = element.desc
                     if (element.rarity === "user") {
                         desc = ""
                     }
                     toJB += `- ${element.name}${desc === "" ? "" : " - " + desc}
 `
-                    attached.push(c.id)
+                    attached.push(element.id)
                 });
             });
 
@@ -389,7 +390,8 @@ ${hovered[0].desc}`
             });
 
             chatData.toJB = toJB
-            triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            chatDataHist[chatMessages.message_id] = chatData
+            triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
         }
 
 
@@ -693,7 +695,7 @@ ${hovered[0].desc}`
             await loadAIReply()
 
             //ai user
-            await loadChatData()
+            loadChatData()
 
             //ai
             //intro handler - for multi intro cards
@@ -708,9 +710,9 @@ ${hovered[0].desc}`
             //ai
             //regexes here
             const regexCommands = /(remove|add)\([^\n]+?\)/ig
+            const regexCommandsTest = /(remove|add)\([^\n]+?\)/ig
             const commands = regexCommands.test(input) ? input.matchAll(regexCommands) : ""
-
-            if (verifyInputs() === false) {
+            if (verifyInputs(commands) === false) {
                 await saveData()
                 return
             }

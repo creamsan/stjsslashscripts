@@ -167,11 +167,11 @@
             let swiped
             let unlockCount
             let userMesEdited
-            let chatData = `{{getvar::chatData}}`
-            if (chatData == "") {
-                triggerSlash(`/setvar key=chatData {} |
-                /setvar key=secret {{random::They are aliens from another planet. After a devastating event, they now live their lives here on Earth.::They are the last remnants of an ancient civilization, tasked with protecting powerful relics hidden in the mountains that can alter reality.::They are the exiled descendants of a royal family, living in secrecy to protect their lineage from a powerful enemy seeking to erase their bloodline.::They are the last survivors of a cataclysmic event, living in isolation to preserve their knowledge and traditions while waiting for the world to heal.::They are just hunters. But they also hunt humans when given a chance.}}
+            let chatData = getVariables().chatData == null ? null : JSON.parse(getVariables()["chatData"])
+            if (chatData == null) {
+                triggerSlash(`/setvar key=secret {{random::They are aliens from another planet. After a devastating event, they now live their lives here on Earth.::They are the last remnants of an ancient civilization, tasked with protecting powerful relics hidden in the mountains that can alter reality.::They are the exiled descendants of a royal family, living in secrecy to protect their lineage from a powerful enemy seeking to erase their bloodline.::They are the last survivors of a cataclysmic event, living in isolation to preserve their knowledge and traditions while waiting for the world to heal.::They are just hunters. But they also hunt humans when given a chance.}}
                 `)
+                chatData = {}
                 toReplace = ["Lanya", "{{user}}"]
                 toCut = true
                 swiped = false
@@ -179,7 +179,6 @@
                 userMesEdited = false
             }
             else {
-                chatData = JSON.parse(getVariables()["chatData"])
                 toReplace = chatData["toReplace"]
                 toCut = chatData["toCut"]
                 swiped = chatData["swiped"]
@@ -244,11 +243,11 @@
                 }
                 else {
                     toReplace.push(toInput)
-                    toCut = true
                     updateFragments()
                     saveData()
                     unlockCount--
                     updateUnlockUI()
+                    hint.innerText = ""
                 }
             })
 

@@ -51,9 +51,11 @@
             cursor: pointer;
             transition: background-color 0.3s ease, transform 0.2s ease;
         }
+
         .stylized-button:hover {
             transform: scale(1.05);
         }
+
         .stylized-button:active {
             transform: scale(0.95);
         }
@@ -66,7 +68,8 @@
             <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
         <div id="error_msg">
-            The AI did not generate the expected output. Please swipe or regenerate. If this is the intro, you should ignore this.
+            The AI did not generate the expected output. Please swipe or regenerate. If this is the intro, you should
+            ignore this.
         </div>
         <button class="stylized-button" id="ignore_btn">Ignore</button>
     </div>
@@ -86,46 +89,47 @@
 
 
             //load input
-            const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
-            let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
+            const chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            let input = chatMessages["swipes"][chatMessages["swipe_id"]]
             const regexInput = /<rating>([\S\s](?!<rating>))+?<\/rating>/i
             let rating = regexInput.test(input) ? (input.match(regexInput))[0] : ""
-            input = /yes|no/i.test(input) ? (input.match(/yes|no/i))[0] : ""
+            rating = /yes|no/i.test(input) ? (input.match(/yes|no/i))[0] : ""
 
 
             //load chatdata
             let totalRating
             let gameOver
-            let chatData = `{{getvar::chatData}}`
-            if (chatData == "") {
-                triggerSlash(`/setvar key=chatData {}`)
+            let chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            let chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id-1]
+            if (chatData == null) {
                 rating = ""
                 gameOver = false
                 userMesEdited = false
+                totalRating = 0
+                chatData = {}
+                chatDataHist = {}
             }
             else {
-                chatData = JSON.parse(getVariables()["chatData"])
-                totalRating = chatData["totalRating"]
-                gameOver = chatData["gameOver"]
+                totalRating = chatData.totalRating
+                gameOver = chatData.gameOver
                 userMesEdited = false
             }
 
 
             function saveData() {
-                chatData = {
-                    "totalRating": totalRating,
-                    "rating": rating,
-                    "gameOver": gameOver,
-                    "userMesEdited": userMesEdited
-                }
-                triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+                chatData.totalRating = totalRating
+                chatData.rating = rating
+                chatData.gameOver = gameOver
+                chatData.userMesEdited = userMesEdited
+                chatDataHist[chatMessages.message_id] = chatData
+                triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
             }
 
 
             //intro handler
-            if(newGenSwipes["message_id"] === 0) {
+            if (chatMessages.message_id === 0) {
                 error.style.display = "none"
-                if(newGenSwipes["swipe_id"] === 0) {
+                if (chatMessages.swipe_id === 0) {
                     totalRating = 3
                 }
                 else {
@@ -136,13 +140,13 @@
 
             //verifiers
             if (gameOver) {
-                if(main_cont.parentNode != null) {
+                if (main_cont.parentNode != null) {
                     main_cont.parentNode.removeChild(main_cont)
                 }
                 saveData()
                 return
             }
-            if(newGenSwipes["message_id"] !== 0 && (input == "" || rating == "")) {
+            if (chatMessages["message_id"] !== 0 && (input == "" || rating == "")) {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 saveData()
@@ -152,30 +156,30 @@
 
             let toJB = ""
             //main script func here
-            if(totalRating === 11 || gameOver) {
+            if (totalRating === 11 || gameOver) {
                 toJB += "{{user}} is now a big independent cat. And good timing, the scientists have finally finished their research on you. You are now allowed to leave the facility. As a cat, you're not sad, but relieved and glad that you can leave him alone. Keep this a secret from {{user}}. You don't need to say goodbye."
                 gameOver = true
             }
-            else if(totalRating <= 0) {
+            else if (totalRating <= 0) {
                 toJB += "{{user}}'s immaturity is far too much. What an annoying brat! He might need some spanking if he keeps this up."
             }
-            else if(totalRating <= 2) {
+            else if (totalRating <= 2) {
                 toJB += "{{user}} is such an adorable little kitten. Give him all the attention he needs. Pamper him a lot."
             }
-            else if(totalRating <= 4) {
+            else if (totalRating <= 4) {
                 toJB += "Hmm... guess you were just seeing things. {{user}} is still a kitten who needs you by his side."
             }
-            else if(totalRating <= 6) {
+            else if (totalRating <= 6) {
                 toJB += "It's a beautiful day to relax. {{user}} is so precious and steadily growing."
             }
-            else if(totalRating <= 8) {
+            else if (totalRating <= 8) {
                 toJB += "Hmm... it seems that {{user}} is turning into a big, precious kitten. Your instincts tell you to keep your distance from now on, to encourage his independence."
             }
-            else if(totalRating <= 10) {
+            else if (totalRating <= 10) {
                 toJB += "{{user}} is now a big, independent cat. You are proud of him. Your farewell is near. As a cat, you're not sad, but relieved and glad that you can leave him alone."
             }
 
-            
+
             updateJB()
             saveData()
 

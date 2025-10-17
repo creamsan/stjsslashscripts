@@ -127,7 +127,6 @@
             let userMesEdited
             let chatData = `{{getvar::chatData}}`
             if (chatData == "") {
-                triggerSlash(`/setvar key=chatData {}`)
                 swiped = false
                 toCut = true
                 removeCount = 3

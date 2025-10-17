@@ -90,23 +90,33 @@
         let cards
         //let newCards
         let chatData
+        let chatDataHist
         //user side
         function loadChatData() {
-            chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+            chatDataHist = JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist[chatMessages.message_id-1]
             toJB = chatData.toJB
             gameOver = chatData.gameOver
             userMesEdited = chatData.userMesEdited
-            //cards = chatData.cards
             cards = chatData.newCards
         }
 
 
+        const MAX_CHATDATA_HISTORY = 20
         async function saveData() {
             chatData.toJB = toJB
             chatData.gameOver = gameOver
             chatData.userMesEdited = userMesEdited
             chatData.cards = cards
-            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            chatDataHist[chatMessages.message_id] = chatData
+            const keys = Object.keys(chatDataHist)
+            const diff = keys.length - MAX_CHATDATA_HISTORY
+            if(keys.length > MAX_CHATDATA_HISTORY) {
+                for(let i = 0; i < diff; i++) {
+                    delete chatDataHist[keys[i]]
+                }
+            }
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
         }
 
 
@@ -191,12 +201,11 @@
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             //user
+            await loadChatMessages()
             await loadChatData()
 
             //user
             if (await handleUserMesEdit()) return
-
-            await loadChatMessages()
 
             //main func start here
             if (gameOver) {
@@ -215,25 +224,26 @@
 
             toJB = `- Please include the following at the beginning of the next response:
 <result>
-[Function sequence here]
+[Function sequence here.]
 </result>
 - Inside the result tags are functions that simulate the entities' reactions based on the existence and combinations of other entities.
 - Functions available are: add(name, imageDescription, rarity, flavorText, count) and remove(name)
 - Parameters:
-- name - a string. As much as possible, pass a noun only. Use imageDescription and flavorText params for descriptors and adjectives.
+- name - a string. As much as possible, pass a noun only. Use imageDescription and flavorText params for descriptors/adjectives.
 - imageDescription - a string that vividly_describes_this_entity_separated_by_underscores.
 - rarity - a string that describes how rare this entity is. Rarities include: "junk", "common", "rare", "legendary", "dangerous" and "unique". Unique entities are one-of-a-kind and most likely have their own name.
 - flavorText - if the entity has something of note, then include a short single sentence flavor text. Otherwise leave an empty string ("").
 - count - defaults to 1, if multiple entity are created, specify an integer.
 
+- Like programming, the sequence must be methodical and thorough. No shortcuts.
 - To use the functions: First, take a look at the combinations. Which entity will be added? Which one will be removed? Here's an example:
 - Combination 1:
 - Baseball Bat
 - Zombie
 - {{user}}
 
-- Depending on the context, {{user}} may be using the baseball bat to strike the zombie. However, the baseball bat is destroyed in the process. The function sequence may be:
-remove("Zombie") //remove the "Zombie". As much as possible, match the names.
+- Depending on the context, {{user}} may be using the baseball bat to strike the zombie. However, the baseball bat's condition may be low and is destroyed in the process. The function sequence may be:
+remove("Zombie") //remove the "Zombie". As much as possible, match the existing names.
 remove("Baseball Bat") //remove the baseball bat since it was destroyed when hitting the zombie
 add("Zombie Corpse", "bloody_zombie_corpse_lying_on_the_floor", "common", "") //add a zombie corpse entity
 
@@ -248,7 +258,7 @@ add("Zombie Corpse", "bloody_zombie_corpse_lying_on_the_floor", "common", "") //
 - Keep it simple. Do whatever seems most interesting and funny and makes the most sense for the situation. In this case, since Bob is a glutton, he eats.
 remove("Pie") //Bob ate it
 remove("Cake") //Bob ate it
-add("Vomit", "puddle_of_yellowish_liquid_slop_on_the_ground", "unique", "Maybe this is the final ingredient for the potion you're making.") //Bob overate and vomits
+add("Vomit", "puddle_of_yellowish_liquid_slop_on_the_ground", "unique", "Maybe this is the final ingredient for the potion you're making.") //Bob overate and vomitted
 
 - Finally, add an entity to spice the story up: a random {{random: "junk","junk","junk","common","common","common","common","common","common","common","common","rare","legendary","unique","dangerous"}} entity. You should have gotten the hang of using the add function by now.
 

@@ -126,12 +126,22 @@
         //user side
         async function updateJB() {
             await insertOrAssignVariables({ jbout: "from jb: " + toJB })
-            //toJB = ""
+            toJB = ""
         }
 
 
-        async function updateJB2() {
-            await triggerSlash(`/setvar key=jbout2 from jb2: ${toJB}`)
+        function updateJB3() {
+            uninjectPrompts(["jbout"])
+
+            injectPrompts([{
+                id: "jbout",
+                position: "in_chat",
+                depth: 0,
+                role: "system",
+                content: "from inject: " + toJB
+            }])
+
+            toJB = ""
         }
 
 
@@ -143,14 +153,13 @@
             if (await handleUserMesEdit()) return
 
             //main func start here
-            toJB += " meow"
+            for (let i = 0; i < 500; i++) {
+                toJB += " meow"
+            }
 
             //user
             await updateJB()
-            await updateJB2()
-            await insertOrAssignVariables({ jbout3: "from jb ext: " + toJB })
-
-            toJB = ""
+            updateJB3()
 
             await saveData()
         })

@@ -148,10 +148,9 @@
         let expectingOutput
         let chatData
         //ai side
-        async function loadChatData() {
+        function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
             if (chatData == null) {
-                await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
                 toJB = ""
                 gameOver = false
@@ -228,7 +227,7 @@
             await loadAIReply()
 
             //ai
-            await loadChatData()
+            loadChatData()
 
             //ai
             //regexes here

@@ -301,9 +301,8 @@
             let goalPos
             let movablesPos
             let userMesEdited
-            let chatData = `{{getvar::chatData}}`
-            if (chatData == "") {
-                triggerSlash(`/setvar key=chatData {}`)
+            let chatData = getVariables().chatData == null ? null : JSON.parse(getVariables()["chatData"])
+            if (chatData == null) {
                 gameOver = false
                 speedFactor = 1
                 playerSpeed = 100
@@ -329,7 +328,6 @@
                 saveState()
             }
             else {
-                chatData = JSON.parse(getVariables()["chatData"])
                 visibilityLerp = 0
                 origSpeed = chatData["origSpeed"]
                 playerSpeed = chatData["playerSpeed"]

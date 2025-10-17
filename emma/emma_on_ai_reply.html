@@ -137,10 +137,9 @@
         let chatData
         let cooldown
         //ai side
-        async function loadChatData() {
+        function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
             if (chatData == null) {
-                await triggerSlash(`/setvar key=chatData {}`)
                 chatData = {}
                 toJB = ""
                 expectingOutputOnId = -1
@@ -207,7 +206,7 @@
             await loadAIReply()
 
             //ai
-            await loadChatData()
+            loadChatData()
 
             //ai
             //regexes here

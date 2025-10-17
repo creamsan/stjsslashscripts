@@ -75,8 +75,10 @@
         let pokerData
         let cooldown
         let expectingOutput
+        let chatMessages
         function loadChatData() {
-            chatData = JSON.parse(getVariables().chatData)
+            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist[chatMessages.message_id-1]
             toJB = chatData.toJB
             gameOver = chatData.gameOver
             userMesEdited = chatData.userMesEdited
@@ -86,13 +88,22 @@
         }
 
 
+        const MAX_CHATDATA_HISTORY = 20
         async function saveData() {
             chatData.gameOver = gameOver
             chatData.toJB = toJB
             chatData.userMesEdited = userMesEdited
             chatData.cooldown = cooldown
             chatData.expectingOutput = expectingOutput
-            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
+            chatDataHist[chatMessages.message_id] = chatData
+            const keys = Object.keys(chatDataHist)
+            const diff = keys.length - MAX_CHATDATA_HISTORY
+            if(keys.length > MAX_CHATDATA_HISTORY) {
+                for(let i = 0; i < diff; i++) {
+                    delete chatDataHist[keys[i]]
+                }
+            }
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
         }
 
 
@@ -111,8 +122,25 @@
         //user side
         async function updateJB() {
             await insertOrAssignVariables({ jbout: toJB })
-            await triggerSlash("/delay 250")
             toJB = ""
+        }
+
+
+        // function updateJB() {
+        //     uninjectPrompts(["jbout"])
+        //     injectPrompts([{
+        //         id: "jbout",
+        //         position: "in_chat",
+        //         depth: 0,
+        //         role: "system",
+        //         content: toJB
+        //     }])
+        //     toJB = ""
+        // }
+
+
+        async function loadChatMessages() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
         }
 
 
@@ -189,6 +217,7 @@
 
         //main
         document.addEventListener("DOMContentLoaded", async function () {
+            await loadChatMessages()
             loadChatData()
 
             if (await handleUserMesEdit()) return
