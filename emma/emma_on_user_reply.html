@@ -78,97 +78,32 @@
     <script>
         const main_cont = document.getElementById("main_cont")
 
-
-        let toJB
-        let gameOver
-        let userMesEdited
-        let expectingOutputOnId
-        let chatData
-        let selected
-        let cooldown
+        let toUserProcess
+        let chatMessages
         //user side
         function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
-            toJB = chatData.toJB
-            expectingOutputOnId = chatData.expectingOutputOnId
-            userMesEdited = chatData.userMesEdited
-            selected = chatData.selected
-            cooldown = chatData.cooldown
+            toUserProcess = chatData.toUserProcess
         }
 
+
         async function saveData() {
-            chatData.toJB = toJB
-            chatData.expectingOutputOnId = expectingOutputOnId
-            chatData.userMesEdited = userMesEdited
-            chatData.selected = selected
-            chatData.cooldown = cooldown
+            chatData.expectingOutputOnId = toUserProcess.expectingOutputOnId === "next" ? Number.parseInt(chatMessages.message_id) + 1 : -1
+            chatData.selected = toUserProcess.selected
+            chatData.cooldown = toUserProcess.cooldown
             await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
 
-        //user side
-        async function handleUserMesEdit() {
-            if (userMesEdited) {
-                main_cont.parentNode.removeChild(main_cont)
-                await saveData()
-                return true
-            }
-            userMesEdited = true
-            swiped = false
-            return false
-        }
-
-
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
+        async function loadChatMessages() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
         }
 
 
         //main
         document.addEventListener("DOMContentLoaded", async function () {
+            await loadChatMessages()
             await loadChatData()
-
-            //user
-            if (await handleUserMesEdit()) return
-
-            //main func starts here
-            if(selected || cooldown === 0) {
-                toJB += `- {{user}}'s particles currently seem predictable. You can see two outcomes rather than one. It's time to test them.
-- At the end of your next response, please include the following:
-<predictions>
-Prediction A
-Title: [Title of this outcome; one to five words should suffice]
-Content: [You will play the role of {{user}}. Describe the upcoming events from his perspective. Use first-person pronouns during dialogue and narration. If included, refer to {{char}} in third person.]
-
-Prediction B
-Title: [Title of this outcome, one to five words should suffice]
-Content: [Same guidelines as the above.]
-</predictions>
-- Here's an example. It's a bit rough and short. But you get the point:
-<predictions>
-Prediction A
-Title: Spooked
-Content: I stumbled back, my shoulder hitting the doorframe. "Hey! Wtf! where'd you came from? Oh shit! A ghost?"
-
-Prediction B
-Title: Confused
-Content: "Uh... Who...? What are you talking about?" I took a cautious step back as my eyes scanned her. "Maybe you should sit down."
-</predictions> 
-`
-                selected = false
-                const chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
-                expectingOutputOnId = chatMessages.message_id + 1
-            }
-            else if(cooldown > 0) {
-                cooldown--
-                toJB += `- No prediction for now.
-`
-            }
-
-            //user
-            await updateJB()
             await saveData()
         })
     </script>

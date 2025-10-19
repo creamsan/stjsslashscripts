@@ -790,35 +790,31 @@
         }
 
 
-        let toJB
+        let toJB = ""
         let gameOver
-        let userMesEdited
         let chatData
         let chatDataHist
         let cooldown
-        let expectingOutput
+        let expectingOutputOnId
         let pause = false
+        let toUserProcess = {}
         function loadChatData() {
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
             chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id - 1]
             if (chatData == null) {
                 chatData = {}
                 chatDataHist = {}
-                toJB = ""
                 gameOver = false
-                userMesEdited = false
                 cooldown = 0
-                expectingOutput = false
+                expectingOutputOnId = -1
                 poker = new Poker()
                 p1 = poker.player1
                 p2 = poker.player2
                 nextPokerPhase()
             }
             else {
-                toJB = chatData.toJB
                 gameOver = chatData.gameOver
-                expectingOutput = chatData.expectingOutput
-                userMesEdited = false
+                expectingOutputOnId = chatData.expectingOutputOnId
                 cooldown = chatData.cooldown
                 poker = Poker.fromJSON(chatData.pokerData)
                 p1 = poker.player1
@@ -829,10 +825,7 @@
 
         async function saveData() {
             chatData.gameOver = gameOver
-            chatData.userMesEdited = userMesEdited
-            chatData.toJB = toJB
-            chatData.expectingOutput = expectingOutput
-            chatData.cooldown = cooldown
+            chatData.toUserProcess = toUserProcess
             chatData.pokerData = poker.toJSON()
             chatDataHist[chatMessages.message_id] = chatData
             await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
@@ -880,24 +873,26 @@
 
             if (gameOver) {
                 main_cont.parentNode.removeChild(main_cont)
+                prepToUserProcess()
+                updateJB()
                 return false
             }
 
-            if (mesId != 0 && input == "" && expectingOutput) {
+            if (mesId != 0 && input == "" && expectingOutputOnId === mesId) {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 return false
             }
 
             for (const element of toVerify) {
-                if (mesId != 0 && (element == "" || correctFormat(element) === false) && expectingOutput) {
+                if (mesId != 0 && (element == "" || correctFormat(element) === false) && expectingOutputOnId === mesId) {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
                 }
             }
 
-            if (mesId === 0 || expectingOutput === false) {
+            if (mesId === 0 || expectingOutputOnId !== mesId) {
                 pause = true
                 main_cont.style.display = "none"
                 error.style.display = "none"
@@ -952,7 +947,6 @@
                 continueBtn.style.visibility = "visible"
                 return
             }
-            //hideMoveBtns()
             switch (poker.phase) {
                 case Poker.PHASE.ASSIGN_DEALER:
                     showAICards([])
@@ -975,8 +969,6 @@
                     showCardsToExchange(p1.hand)
                     exchangeBtn.style.visibility = "hidden"
                     if (poker.dealer.name === "{{user}}") {
-                        //showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
-                        //tell ai to: check, raise, fold
                         aiMakeMove("first")
                     }
                     else {
@@ -993,8 +985,6 @@
                     showCardsToExchange(p1.hand)
                     exchangeBtn.style.visibility = "hidden"
                     if (poker.dealer.name === "{{user}}") {
-                        //showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
-                        //tell ai to: check raise, fold
                         aiMakeMove("first")
                     }
                     else {
@@ -1275,6 +1265,8 @@
 
                 showCardsToExchange(p1.hand)
                 nextPokerPhase()
+                prepToUserProcess()
+                updateJB()
                 saveData()
                 const a = "{{"
                 const b = "input"
@@ -1306,9 +1298,11 @@
                     }
                 });
                 pause = true
-                expectingOutput = false
+                expectingOutputOnId = -1
                 cooldown = 1
                 if (gameOver === false) nextPokerPhase()
+                prepToUserProcess()
+                updateJB()
                 saveData()
                 const a = "{{"
                 const b = "input"
@@ -1328,19 +1322,15 @@
                 let callVal = Math.min(p1.bank, poker.lastBet)
                 poker.playerMove(p1, Poker.MOVES.CALL, callVal)
                 hideMoveBtns()
-                //tell ai: which cards to discard
                 nextPokerPhase()
             })
             p1Check.addEventListener("click", function () {
                 poker.playerMove(p1, Poker.MOVES.CHECK)
                 hideMoveBtns()
                 if (poker.lastBetter === p1) {
-                    //tell ai: which cards to discard????
                     nextPokerPhase()
                 }
                 else {
-                    //showAvailableBtns(MOVES_AFTER_CHECK, p2BtnsArr)
-                    //tell ai to: check, raise, fold
                     aiMakeMove("check")
                     updateStats()
                 }
@@ -1350,8 +1340,6 @@
                 raiseVal = Math.min(p1.bank, raiseVal)
                 poker.playerMove(p1, Poker.MOVES.RAISE, raiseVal)
                 hideMoveBtns()
-                //showAvailableBtns(MOVES_AFTER_RAISE, p2BtnsArr)
-                //tell ai to: call, raise, fold
                 aiMakeMove("raise", raiseVal)
                 updateStats()
             })
@@ -1359,7 +1347,6 @@
                 poker.playerMove(p1, Poker.MOVES.FOLD)
                 hideMoveBtns()
                 updateStats()
-                //tell ai: it won after user folding
                 toJB += `- {{user}} folded. You won.
 `
                 continueBtn.style.visibility = "visible"
@@ -1369,8 +1356,78 @@
 
             getAIMove(aiMove)
             nextPokerPhase(false)
-            await saveData()
+
+            prepToUserProcess()
+            updateJB()
+            saveData()
         })
+
+
+        //ai side
+        function prepToUserProcess() {
+            toUserProcess.cooldown = cooldown
+
+            //process stuff to be updated on user side
+            if (gameOver) {
+                toJB += `The game is over. ${poker.winner.name === "{{user}}" ? "{{user}} is" : "You are"} the winner of the match.
+`
+                return
+            }
+
+            if (cooldown > 0) {
+                toUserProcess.expectingOutputOnId = -1
+                toUserProcess.cooldown--
+                toJB += `- The cards are being shuffled.
+- Do not bet yet.
+- In the meantime, engage with {{user}}`
+            }
+            else {
+                const hand = poker.player2.hand
+                switch (poker.phase) {
+                    case Poker.PHASE.PRE_EXCHANGE_BETS:
+                        toJB += `- It is now the pre-exchange betting phase.
+- Your hand: ${hand} - ${poker.descriptiveHand(poker.evaluateHand(hand))}
+- Please include the following at the end of your response:
+<move>
+Bet: [How much you're willing to bet for this hand, from 0 to ${poker.player2.bank} only. Zero means folding or checking if there's no last bet.]
+Discard: [The cards in your hand that you want replaced, separated by commas.]
+</move>
+- Cards are represented by two characters. The first character represents the card's value. For example, an ace is represented by an A, a king by a K, a seven by a 7, a ten by a T, and so on. The second character represents the suit: S for spade, H for heart, C for club, and D for diamond.
+- Here's an example:
+<move>
+Bet: 10
+Discard: AH, 7C, KD, TS
+</move>
+- Another example of when you're happy with your hand and don't discard anything. Just don't include discard.
+<move>
+Bet: 50
+</move>
+`
+                        break
+                    case Poker.PHASE.POST_EXCHANGE_BETS:
+                        toJB += `- It is now the post-exchange betting phase.
+- Your hand: ${hand} - ${poker.descriptiveHand(poker.evaluateHand(hand))}
+- Please include the following at the end of your response:
+<move>
+Bet: [How much you're willing to bet for this hand, from 0 to ${poker.player2.bank} only. Zero means folding or checking if there's no last bet.]
+</move>
+- Here's an example:
+<move>
+Bet: 20
+</move>
+`
+                        break
+                }
+                toUserProcess.expectingOutputOnId = "next"
+            }
+        }
+
+
+        //ai side
+        async function updateJB() {
+            await insertOrAssignVariables({ jbout: toJB })
+            toJB = ""
+        }
     </script>
 </body>
 

@@ -39,10 +39,8 @@
 
             //load chatdata
             let chatData = JSON.parse(getVariables()["chatData"])
-            let toCut = chatData["toCut"]
             let unlockCount = chatData["unlockCount"]
             let userMesEdited = chatData["userMesEdited"]
-            let swiped = false
 
 
             //edit handler - user side
@@ -53,19 +51,15 @@
             }
             userMesEdited = true
 
-
-            toCut = true
             unlockCount = 5
             
-
             saveData()
 
-
             function saveData() {
-                chatData["toCut"] = toCut
+                chatData["toCut"] = true
                 chatData["unlockCount"] = unlockCount
                 chatData["userMesEdited"] = userMesEdited
-                chatData["swiped"] = swiped
+                chatData["swiped"] = false
                 triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
             }
         })

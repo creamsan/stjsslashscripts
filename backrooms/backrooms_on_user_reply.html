@@ -102,7 +102,6 @@
         }
 
 
-        let toJB
         let gameOver
         let swiped
         let toCut
@@ -114,7 +113,6 @@
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
             if (chatData == null) {
                 chatData = {}
-                toJB = ""
                 gameOver = false
                 swiped = false
                 toCut = true
@@ -122,7 +120,6 @@
                 userMesEdited = false
             }
             else {
-                toJB = chatData.toJB
                 gameOver = chatData.gameOver
                 swiped = chatData.swiped
                 toCut = chatData.toCut
@@ -134,7 +131,6 @@
         //user side
         function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
-            toJB = chatData.toJB
             gameOver = chatData.gameOver
             swiped = chatData.swiped
             toCut = chatData.toCut
@@ -143,7 +139,6 @@
         }
 
         async function saveData() {
-            chatData.toJB = toJB
             chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.toCut = toCut
@@ -217,14 +212,6 @@
             swiped = false
             return false
         }
-
-
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
-        }
-
 
         //ai side
         function updateAIMes() {

@@ -88,6 +88,7 @@
             color: white;
             transition: transform 0.3s ease, color 0.3s ease;
         }
+
         .animated-text:hover {
             transform: scale(1.1);
             color: white;
@@ -108,9 +109,7 @@
         <button class="stylized-button" id="ignore_btn">Ignore</button>
     </div>
     <div id="main_cont">
-        <button id="choice1" class="stylized-button choices">choice 1</button>
-        <button id="choice2" class="stylized-button choices">choice 2</button>
-        <button id="reject" class="animated-text stylized-button choices">Reject fate</button>
+        <img id="image" src="" alt="">
     </div>
 
     <script>
@@ -197,7 +196,7 @@
             }
 
             for (const element of toVerify) {
-                if (element == "" || correctFormat(element)) {
+                if (element == "") {
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
@@ -214,35 +213,47 @@
         }
 
 
-        function correctFormat(aiInput) {
-            //extra verifaction
-
-        }
-
-
         //main
         document.addEventListener("DOMContentLoaded", async function () {
-            //ai
-            initError()
-            await loadAIReply()
+            function loadImageWithTimeout(imageUrl, placeholderUrl, timeout = 5000) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    let isLoaded = false;
 
-            //ai
-            loadChatData()
+                    //timeout
+                    const timer = setTimeout(() => {
+                        if (!isLoaded) {
+                            console.log('Image loading timed out, using placeholder');
+                            img.src = placeholderUrl;
+                            resolve(placeholderUrl);
+                        }
+                    }, timeout);
 
-            //ai
-            //regexes here
-            const regexVar = /regex/i
-            const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
+                    img.onload = () => {
+                        isLoaded = true;
+                        clearTimeout(timer);
+                        resolve(imageUrl);
+                    };
 
-            const toVerify = []
-            if (verifyInputs(toVerify) === false) {
-                await saveData()
-                return
+                    img.onerror = () => {
+                        isLoaded = true;
+                        clearTimeout(timer);
+                        console.log('Image failed to load, using placeholder');
+                        resolve(placeholderUrl);
+                    };
+
+                    img.src = imageUrl;
+                });
             }
 
-            //main func start here
+            const image_link = await loadImageWithTimeout(
+                'https://image.pollinations.ai/prompt/digital_illustration_rainbow_crocodile_with_afro',
+                'https://placeholderimagegenerator.com/wp-content/uploads/2024/12/Light-placeholder-image-circule_png_.png',
+                5000 // 5 second timeout
+            )
 
-            await saveData()
+            console.log(image_link)
+
         })
     </script>
 </body>

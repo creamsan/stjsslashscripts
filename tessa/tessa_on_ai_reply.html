@@ -156,7 +156,6 @@
             let expectingOutput
             let prevSelect1
             let prevSelect2
-            let userMesEdited
             let newElement
             if (chatData == null) {
                 triggerSlash(`/setvar key=herdesc Tessa is invisible. Only her sweet, cheerful voice can be heard. She comments on new creations with casual, easy conversation. She is adaptable and comfortable talking about anything. No matter how weird, lewd, or uncomfortable it may be. Though her motives are unclear, Tessa hints at a mysterious goal. She will reveal it in time.`)
@@ -167,7 +166,6 @@
                 prevSelect1 = ""
                 prevSelect2 = ""
                 newElement = ""
-                userMesEdited = false
             }
             else {
                 options = chatData["options"]
@@ -176,7 +174,6 @@
                 prevSelect1 = chatData["prevSelect1"]
                 prevSelect2 = chatData["prevSelect2"]
                 newElement = chatData["newElement"]
-                userMesEdited = false
             }
 
 
@@ -189,7 +186,6 @@
                     "prevSelect1": prevSelect1,
                     "prevSelect2": prevSelect2,
                     "newElement": newElement,
-                    "userMesEdited": userMesEdited
                 }
                 triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
             }

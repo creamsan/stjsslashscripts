@@ -300,7 +300,6 @@
             let timeSinceStarted = 0
             let goalPos
             let movablesPos
-            let userMesEdited
             let chatData = getVariables().chatData == null ? null : JSON.parse(getVariables()["chatData"])
             if (chatData == null) {
                 gameOver = false
@@ -312,7 +311,6 @@
                 playerVisibility = 150
                 origSpeed = playerSpeed
                 origHealth = playerHealth
-                userMesEdited = false
 
                 const MAX_DIST = 15000
                 let randX = -MAX_DIST + (MAX_DIST + MAX_DIST) * Math.random()
@@ -342,7 +340,6 @@
                 goalPos = chatData["goalPos"]
                 gameOver = chatData["gameOver"]
                 vals = chatData["vals"]
-                userMesEdited = false
 
                 goal.style.transform = `translateX(${goalPos[0]}px) translateY(${goalPos[1]}px)`
                 Object.keys(movablesPos).forEach((entity) => {
@@ -439,7 +436,7 @@
                     "goalPos": arr,
                     "gameOver": gameOver,
                     "vals": vals,
-                    "userMesEdited": userMesEdited
+                    "userMesEdited": false
                 }
 
                 triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)

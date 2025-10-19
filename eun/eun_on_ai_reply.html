@@ -124,7 +124,6 @@
             let toCut
             let removeCount
             let toReplace
-            let userMesEdited
             let chatData = `{{getvar::chatData}}`
             if (chatData == "") {
                 swiped = false
@@ -136,7 +135,6 @@
                 toReplace.push(genCorruptFragment())
                 toReplace.push(genCorruptFragment())
                 toReplace.push(genCorruptFragment())
-                userMesEdited = false
             }
             else {
                 chatData = JSON.parse(getVariables()["chatData"])
@@ -144,7 +142,6 @@
                 toCut = chatData["toCut"]
                 toReplace = chatData["toReplace"]
                 removeCount = chatData["removeCount"]
-                userMesEdited = false
             }
 
 
@@ -154,7 +151,7 @@
                     "toCut": toCut,
                     "toReplace": toReplace,
                     "removeCount": removeCount,
-                    "userMesEdited": userMesEdited
+                    "userMesEdited": false
                 }
                 triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
             }

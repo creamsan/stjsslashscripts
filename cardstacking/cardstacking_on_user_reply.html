@@ -84,35 +84,36 @@
         const main_cont = document.getElementById("main_cont")
 
 
-        let toJB
         let gameOver
         let userMesEdited
         let cards
-        //let newCards
         let chatData
         let chatDataHist
+        let toUserProcess
         //user side
         function loadChatData() {
             chatDataHist = JSON.parse(getVariables().chatDataHist)
-            chatData = chatDataHist[chatMessages.message_id-1]
-            toJB = chatData.toJB
+            chatData = chatDataHist[chatMessages.message_id - 1]
             gameOver = chatData.gameOver
+            cards = chatData.toUserProcess.newCards
             userMesEdited = chatData.userMesEdited
-            cards = chatData.newCards
+            toUserProcess = chatData.toUserProcess
         }
 
 
         const MAX_CHATDATA_HISTORY = 20
         async function saveData() {
-            chatData.toJB = toJB
             chatData.gameOver = gameOver
             chatData.userMesEdited = userMesEdited
             chatData.cards = cards
+            chatData.bombCooldown = toUserProcess.bombCooldown
+            chatData.bombInfo = toUserProcess.bombInfo
+            chatData.hasDestroyGoal = toUserProcess.hasDestroyGoal
             chatDataHist[chatMessages.message_id] = chatData
             const keys = Object.keys(chatDataHist)
             const diff = keys.length - MAX_CHATDATA_HISTORY
-            if(keys.length > MAX_CHATDATA_HISTORY) {
-                for(let i = 0; i < diff; i++) {
+            if (keys.length > MAX_CHATDATA_HISTORY) {
+                for (let i = 0; i < diff; i++) {
                     delete chatDataHist[keys[i]]
                 }
             }
@@ -124,7 +125,6 @@
         async function loadChatMessages() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
         }
-
 
 
         //user side
@@ -139,62 +139,33 @@
         }
 
 
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            //toJB = ""
+        function removeCards() {
+            toUserProcess.toBeRemoved.forEach(element => {
+                const index = cards.findIndex(obj => obj.name === element.name && obj.img === element.img && obj.rarity === element.rarity && obj.desc === element.desc);
+                if (index !== -1) {
+                    cards.splice(index, 1);
+                }
+            });
+
+            toUserProcess.toBeRemoved = []
         }
 
 
+        const MAX_CARD_COUNT = 20
         function triggerSpecialCards() {
+            //remover
+            cards = cards.filter(card => card.rarity !== "remover")
+            if (cards.length > MAX_CARD_COUNT) {
+                cards.push({ name: "Remover", img: "remover", rarity: "remover", desc: "Place the cards you want to remove here." })
+            }
+
+            //combiner
             switch (chatMessages.message_id) {
                 case 7:
                 case 15:
                 case 35:
                     cards.push({ name: "Combiner", img: "combiner", rarity: "combiner", desc: "Place the cards you want to combine here." })
             }
-
-            let userAlive = false
-            let toDestroyCount = 0
-            cards.forEach(card => {
-                switch (card.rarity) {
-                    case "user":
-                        userAlive = true
-                        break
-                    case "bomb":
-                        if (chatData.bombCooldown === undefined) {
-                            chatData.bombCooldown = 5
-                        }
-                        else {
-                            chatData.bombCooldown -= 1
-                        }
-                        break
-                    case "todestroy":
-                        if (chatData.hasDestroyGoal === undefined) {
-                            chatData.hasDestroyGoal = true
-                        }
-                        toDestroyCount++
-                        break
-                }
-            });
-
-            if (chatData.bombCooldown === 0) {
-                toJB = `- The bomb exploded. Everyone died. Game over.
-`
-                return false
-            }
-            if (toDestroyCount === 0 && chatData.hasDestroyGoal) {
-                toJB = `- Goal achieved. {{user}} destroyed every obstacle in his way. Game over.
-`
-                return false
-            }
-            if (userAlive === false) {
-                toJB = `- {{user}} is dead. Game over.
-`
-                return false
-            }
-
-            return true
         }
 
 
@@ -209,65 +180,11 @@
 
             //main func start here
             if (gameOver) {
-                await updateJB()
                 await saveData()
                 return
             }
-
-            if (triggerSpecialCards() === false) {
-                gameOver = true
-                toastr.info("Game over")
-                await updateJB()
-                await saveData()
-                return
-            }
-
-            toJB = `- Please include the following at the beginning of the next response:
-<result>
-[Function sequence here.]
-</result>
-- Inside the result tags are functions that simulate the entities' reactions based on the existence and combinations of other entities.
-- Functions available are: add(name, imageDescription, rarity, flavorText, count) and remove(name)
-- Parameters:
-- name - a string. As much as possible, pass a noun only. Use imageDescription and flavorText params for descriptors/adjectives.
-- imageDescription - a string that vividly_describes_this_entity_separated_by_underscores.
-- rarity - a string that describes how rare this entity is. Rarities include: "junk", "common", "rare", "legendary", "dangerous" and "unique". Unique entities are one-of-a-kind and most likely have their own name.
-- flavorText - if the entity has something of note, then include a short single sentence flavor text. Otherwise leave an empty string ("").
-- count - defaults to 1, if multiple entity are created, specify an integer.
-
-- Like programming, the sequence must be methodical and thorough. No shortcuts.
-- To use the functions: First, take a look at the combinations. Which entity will be added? Which one will be removed? Here's an example:
-- Combination 1:
-- Baseball Bat
-- Zombie
-- {{user}}
-
-- Depending on the context, {{user}} may be using the baseball bat to strike the zombie. However, the baseball bat's condition may be low and is destroyed in the process. The function sequence may be:
-remove("Zombie") //remove the "Zombie". As much as possible, match the existing names.
-remove("Baseball Bat") //remove the baseball bat since it was destroyed when hitting the zombie
-add("Zombie Corpse", "bloody_zombie_corpse_lying_on_the_floor", "common", "") //add a zombie corpse entity
-
-- Combinations done. Next, take a look at the list of remaining entities. Which entity will be added? Which one will be removed? Here's an example:
-- Remaining entities:
-- Bob - Gluttonous bastard
-- Pie
-- Stone
-- Cake
-- Mana Potion
-
-- Keep it simple. Do whatever seems most interesting and funny and makes the most sense for the situation. In this case, since Bob is a glutton, he eats.
-remove("Pie") //Bob ate it
-remove("Cake") //Bob ate it
-add("Vomit", "puddle_of_yellowish_liquid_slop_on_the_ground", "unique", "Maybe this is the final ingredient for the potion you're making.") //Bob overate and vomitted
-
-- Finally, add an entity to spice the story up: a random {{random: "junk","junk","junk","common","common","common","common","common","common","common","common","rare","legendary","unique","dangerous"}} entity. You should have gotten the hang of using the add function by now.
-
-- Briefing done. Here's the actual data. Keep it simple. First thoughts are the best thoughts:
-` + toJB
-
-            //user
-            await updateJB()
-            toJB = ""
+            removeCards()
+            triggerSpecialCards()
 
             await saveData()
         })

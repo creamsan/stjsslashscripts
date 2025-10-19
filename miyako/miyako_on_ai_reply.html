@@ -104,7 +104,6 @@
             if (chatData == null) {
                 rating = ""
                 gameOver = false
-                userMesEdited = false
                 totalRating = 0
                 chatData = {}
                 chatDataHist = {}
@@ -112,7 +111,6 @@
             else {
                 totalRating = chatData.totalRating
                 gameOver = chatData.gameOver
-                userMesEdited = false
             }
 
 
@@ -120,7 +118,7 @@
                 chatData.totalRating = totalRating
                 chatData.rating = rating
                 chatData.gameOver = gameOver
-                chatData.userMesEdited = userMesEdited
+                chatData.userMesEdited = false
                 chatDataHist[chatMessages.message_id] = chatData
                 triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
             }

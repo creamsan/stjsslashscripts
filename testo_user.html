@@ -80,7 +80,6 @@
         const main_cont = document.getElementById("main_cont")
 
 
-        let toJB
         let gameOver
         let swiped
         let toCut
@@ -91,7 +90,6 @@
         //user side
         function loadChatData() {
             chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
-            toJB = chatData.toJB
             gameOver = chatData.gameOver
             swiped = chatData.swiped
             toCut = chatData.toCut
@@ -100,7 +98,6 @@
         }
 
         async function saveData() {
-            chatData.toJB = toJB
             chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.toCut = toCut
@@ -123,28 +120,6 @@
         }
 
 
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: "from jb: " + toJB })
-            toJB = ""
-        }
-
-
-        function updateJB3() {
-            uninjectPrompts(["jbout"])
-
-            injectPrompts([{
-                id: "jbout",
-                position: "in_chat",
-                depth: 0,
-                role: "system",
-                content: "from inject: " + toJB
-            }])
-
-            toJB = ""
-        }
-
-
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             await loadChatData()
@@ -153,13 +128,6 @@
             if (await handleUserMesEdit()) return
 
             //main func start here
-            for (let i = 0; i < 500; i++) {
-                toJB += " meow"
-            }
-
-            //user
-            await updateJB()
-            updateJB3()
 
             await saveData()
         })

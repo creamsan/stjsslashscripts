@@ -112,7 +112,7 @@
         }
 
 
-        let toJB
+        let toJB = ""
         let gameOver
         let swiped
         let toCut
@@ -120,6 +120,7 @@
         let expectingOutputOnId
         let chatData
         let chatDataHist
+        let toUserProcess = {}
         //ai side
         function loadChatData() {
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
@@ -127,42 +128,46 @@
             if (chatData == null) {
                 chatData = {}
                 chatDataHist = {}
-                toJB = ""
                 gameOver = false
                 swiped = false
                 toCut = true
-                expectingOutputOnId = false
-                userMesEdited = false
+                expectingOutputOnId = -1
             }
             else {
-                toJB = chatData.toJB
                 gameOver = chatData.gameOver
                 swiped = chatData.swiped
                 toCut = chatData.toCut
                 expectingOutputOnId = chatData.expectingOutputOnId
-                userMesEdited = false
             }
         }
         //user side
         function loadChatData() {
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
             chatData = chatDataHist[chatMessages.message_id-1]
-            toJB = chatData.toJB
             gameOver = chatData.gameOver
-            swiped = chatData.swiped
-            toCut = chatData.toCut
-            expectingOutputOnId = chatData.expectingOutputOnId
             userMesEdited = chatData.userMesEdited
         }
 
 
-        const MAX_CHATDATA_HISTORY = 20
+        //ai side
         async function saveData() {
-            chatData.toJB = toJB
             chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.toCut = toCut
-            chatData.expectingOutputOnId = expectingOutputOnId
+            chatData.userMesEdited = false
+            chatData.toUserProcess = toUserProcess
+            chatDataHist[chatMessages.message_id] = chatData
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
+        }
+
+
+        //user side
+        const MAX_CHATDATA_HISTORY = 20
+        async function saveData() {
+            chatData.gameOver = gameOver
+            chatData.swiped = false
+            chatData.toCut = true
+            chatData.expectingOutputOnId = toUserProcess.expectingOutputOnId === "next" ? Number.parseInt(chatMessages.message_id) + 1 : -1
             chatData.userMesEdited = userMesEdited
             chatDataHist[chatMessages.message_id] = chatData
             const keys = Object.keys(chatDataHist)
@@ -237,15 +242,7 @@
                 return true
             }
             userMesEdited = true
-            swiped = false
             return false
-        }
-
-
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
         }
 
 
@@ -271,6 +268,9 @@ ${origInput}
             //ai
             initError()
             await loadAIReply()
+
+            //user
+            loadChatMessages()
 
             //ai user
             loadChatData()
@@ -303,11 +303,25 @@ ${origInput}
 
             //main func start here
 
-            //user
-            await updateJB()
-
-            await saveData()
+            //ai
+            prepToUserProcess()
+            updateJB()
+            saveData()
         })
+
+
+        //ai side
+        function prepToUserProcess() {
+            //process stuff to be updated on user side
+
+        }
+
+
+        //ai side
+        async function updateJB() {
+            await insertOrAssignVariables({ jbout: toJB })
+            toJB = ""
+        }
     </script>
 </body>
 

@@ -39,12 +39,9 @@
 
             //load chatdata
             let chatData = JSON.parse(getVariables()["chatData"])
-            let toCut = chatData["toCut"]
             let removeCount = chatData["removeCount"]
             let toReplace = chatData["toReplace"]
             let userMesEdited = chatData["userMesEdited"]
-            let swiped = false
-
 
             //edit handler - user side
             if(userMesEdited) {
@@ -54,8 +51,6 @@
             }
             userMesEdited = true
 
-
-            toCut = true
             removeCount = 3
             toReplace.push(genCorruptFragment())
             toReplace.push(genCorruptFragment())
@@ -116,11 +111,11 @@
 
 
             function saveData() {
-                chatData["toCut"] = toCut
+                chatData["toCut"] = true
                 chatData["removeCount"] = removeCount
                 chatData["toReplace"] = toReplace
                 chatData["userMesEdited"] = userMesEdited
-                chatData["swiped"] = swiped
+                chatData["swiped"] = false
                 triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
             }
         })

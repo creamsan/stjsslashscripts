@@ -69,32 +69,22 @@
         const main_cont = document.getElementById("main_cont")
 
         let chatData
-        let toJB
-        let gameOver
-        let userMesEdited
-        let pokerData
         let cooldown
-        let expectingOutput
         let chatMessages
+        let toUserProcess
         function loadChatData() {
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
             chatData = chatDataHist[chatMessages.message_id-1]
-            toJB = chatData.toJB
             gameOver = chatData.gameOver
-            userMesEdited = chatData.userMesEdited
-            pokerData = chatData.pokerData
-            cooldown = chatData.cooldown
-            expectingOutput = chatData.expectingOutput
+            toUserProcess = chatData.toUserProcess
         }
 
 
         const MAX_CHATDATA_HISTORY = 20
         async function saveData() {
             chatData.gameOver = gameOver
-            chatData.toJB = toJB
-            chatData.userMesEdited = userMesEdited
-            chatData.cooldown = cooldown
-            chatData.expectingOutput = expectingOutput
+            chatData.cooldown = toUserProcess.cooldown
+            chatData.expectingOutputOnId = toUserProcess.expectingOutputOnId === "next" ? Number.parseInt(chatMessages.message_id) + 1 : -1
             chatDataHist[chatMessages.message_id] = chatData
             const keys = Object.keys(chatDataHist)
             const diff = keys.length - MAX_CHATDATA_HISTORY
@@ -107,111 +97,8 @@
         }
 
 
-        //user side
-        async function handleUserMesEdit() {
-            if (userMesEdited) {
-                main_cont.parentNode.removeChild(main_cont)
-                await saveData()
-                return true
-            }
-            userMesEdited = true
-            return false
-        }
-
-
-        //user side
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
-        }
-
-
-        // function updateJB() {
-        //     uninjectPrompts(["jbout"])
-        //     injectPrompts([{
-        //         id: "jbout",
-        //         position: "in_chat",
-        //         depth: 0,
-        //         role: "system",
-        //         content: toJB
-        //     }])
-        //     toJB = ""
-        // }
-
-
         async function loadChatMessages() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
-        }
-
-
-        let poker = {
-            HANDS: {
-                HIGH_CARD: 0,
-                ONE_PAIR: 1,
-                TWO_PAIR: 2,
-                THREE_OF_A_KIND: 3,
-                STRAIGHT: 4,
-                FLUSH: 5,
-                FULL_HOUSE: 6,
-                FOUR_OF_A_KIND: 7,
-                STRAIGHT_FLUSH: 8,
-                ROYAL_FLUSH: 9
-            },
-            PHASE: {
-                ASSIGN_DEALER: 0,
-                PLACE_ANTE: 1,
-                DEAL_CARDS: 2,
-                PRE_EXCHANGE_BETS: 3,
-                EXCHANGE: 4,
-                POST_EXCHANGE_BETS: 5,
-                SHOWDOWN: 6
-            }
-        }
-
-
-        function evaluateHand(cards) {
-            const values = cards.map(card => card[0]);
-            const suits = cards.map(card => card[1]);
-
-            const valueCounts = {};
-            values.forEach(value => {
-                valueCounts[value] = (valueCounts[value] || 0) + 1;
-            });
-
-            const uniqueValues = Object.keys(valueCounts);
-            const counts = Object.values(valueCounts).sort((a, b) => b - a);
-
-            const isFlush = new Set(suits).size === 1;
-            const isStraight = uniqueValues.length === 5 && (Math.max(...uniqueValues.map(v => "23456789TJQKA".indexOf(v))) - Math.min(...uniqueValues.map(v => "23456789TJQKA".indexOf(v))) === 4);
-            const royalFlushValues = ['A', 'K', 'Q', 'J', 'T'];
-            const hasRoyalFlush = royalFlushValues.every(value => uniqueValues.includes(value)) && isFlush;
-
-            if (hasRoyalFlush) return poker.HANDS.ROYAL_FLUSH
-            if (isFlush && isStraight) return poker.HANDS.STRAIGHT_FLUSH
-            if (counts[0] === 4) return poker.HANDS.FOUR_OF_A_KIND
-            if (counts[0] === 3 && counts[1] === 2) return poker.HANDS.FULL_HOUSE
-            if (isFlush) return poker.HANDS.FLUSH
-            if (isStraight) return poker.HANDS.STRAIGHT
-            if (counts[0] === 3) return poker.HANDS.THREE_OF_A_KIND
-            if (counts[0] === 2 && counts[1] === 2) return poker.HANDS.TWO_PAIR
-            if (counts[0] === 2) return poker.HANDS.ONE_PAIR
-            return poker.HANDS.HIGH_CARD
-        }
-
-
-        function descriptiveHand(handEnum) {
-            switch (handEnum) {
-                case poker.HANDS.HIGH_CARD: return "High Card"
-                case poker.HANDS.ONE_PAIR: return "One Pair"
-                case poker.HANDS.TWO_PAIR: return "Two Pair"
-                case poker.HANDS.THREE_OF_A_KIND: return "Three of a Kind"
-                case poker.HANDS.STRAIGHT: return "Straight"
-                case poker.HANDS.FLUSH: return "Flush"
-                case poker.HANDS.FULL_HOUSE: return "Full House"
-                case poker.HANDS.FOUR_OF_A_KIND: return "Four of a Kind"
-                case poker.HANDS.STRAIGHT_FLUSH: return "Straight Flush"
-                case poker.HANDS.ROYAL_FLUSH: return "Royal Flush"
-            }
         }
 
 
@@ -219,65 +106,7 @@
         document.addEventListener("DOMContentLoaded", async function () {
             await loadChatMessages()
             loadChatData()
-
-            if (await handleUserMesEdit()) return
-
-            if (gameOver) {
-                toJB += `The game is over. ${pokerData.winner === "{{user}}" ? "{{user}} is" : "You are"} the winner of the match.`
-                await updateJB()
-                await saveData()
-                return
-            }
-
-            if (cooldown > 0) {
-                cooldown--
-                toJB += `- The cards are being shuffled.
-- Do not bet yet.
-- In the meantime, engage with {{user}}`
-            }
-            else {
-                const hand = pokerData.player2.hand
-                switch (pokerData.phase) {
-                    case poker.PHASE.PRE_EXCHANGE_BETS:
-                        toJB += `- It is now the pre-exchange betting phase.
-- Your hand: ${hand} - ${descriptiveHand(evaluateHand(hand))}
-- Please include the following at the end of your response:
-<move>
-Bet: [How much you're willing to bet for this hand, from 0 to ${pokerData.player2.bank} only. Zero means folding or checking if there's no last bet.]
-Discard: [The cards in your hand that you want replaced, separated by commas.]
-</move>
-- Cards are represented by two characters. The first character represents the card's value. For example, an ace is represented by an A, a king by a K, a seven by a 7, a ten by a T, and so on. The second character represents the suit: S for spade, H for heart, C for club, and D for diamond.
-- Here's an example:
-<move>
-Bet: 10
-Discard: AH, 7C, KD, TS
-</move>
-- Another example of when you're happy with your hand and don't discard anything. Just don't include discard.
-<move>
-Bet: 50
-</move>
-`
-                        break
-                    case poker.PHASE.POST_EXCHANGE_BETS:
-                        toJB += `- It is now the post-exchange betting phase.
-- Your hand: ${hand} - ${descriptiveHand(evaluateHand(hand))}
-- Please include the following at the end of your response:
-<move>
-Bet: [How much you're willing to bet for this hand, from 0 to ${pokerData.player2.bank} only. Zero means folding or checking if there's no last bet.]
-</move>
-- Here's an example:
-<move>
-Bet: 20
-</move>
-`
-                        break
-                }
-                expectingOutput = true
-            }
-
-            //main func start here
-            await updateJB()
-            await saveData()
+            saveData()
         })
     </script>
 </body>
