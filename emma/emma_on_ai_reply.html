@@ -217,7 +217,7 @@
             choice2.innerText = title2
             choice1.addEventListener("click", async function () {
                 //random
-                toJB = `- {{user}} acted as predicted. But you still need more data.
+                toJB = `- {{user}} acted as predicted. But {{char}} still needs more data.
 `
                 cooldown = 2
                 prepToUserProcess()
@@ -229,7 +229,7 @@
             })
             choice2.addEventListener("click", async function () {
                 //chain
-                toJB = `- {{user}} acted as predicted. But you still need more data.
+                toJB = `- {{user}} acted as predicted. But {{char}} still needs more data.
 `
                 selected = true
                 cooldown = 2
@@ -268,18 +268,18 @@
             toUserProcess.cooldown = cooldown
 
             if (selected || cooldown === 0) {
-                toJB += `- {{user}}'s particles currently seem predictable. You can see two outcomes rather than one. It's time to test them.
-- At the end of your next response, please include the following:
+                toJB += `- {{user}}'s particles currently seem predictable. {{char}} can see two outcomes. It's time to test them.
+- At the end of {{char}}'s next response, please include the following:
 <predictions>
 Prediction A
 Title: [Title of this outcome; one to five words should suffice]
-Content: [You will play the role of {{user}}. Describe the upcoming events from his perspective. Use first-person pronouns during dialogue and narration. If included, refer to {{char}} in third person.]
+Content: [Play the role of {{user}}. Describe the upcoming events from his perspective. Use first-person pronouns during dialogue and narration. If included, refer to {{char}} in third person.]
 
 Prediction B
 Title: [Title of this outcome, one to five words should suffice]
 Content: [Same guidelines as the above.]
 </predictions>
-- Here's an example. It's a bit rough and short. But you get the point:
+- Here's an example. It's a bit rough and short. But I hope I get my point across:
 <predictions>
 Prediction A
 Title: Spooked
