@@ -1403,7 +1403,7 @@
                     case Poker.PHASE.PRE_EXCHANGE_BETS:
                         toJB += `- It is now the pre-exchange betting phase.
 - ${opponentName}'s hand: ${hand} - ${poker.descriptiveHand(poker.evaluateHand(hand))}
-- Please include the following at the end her next response:
+- Please include the following at the end of her next response:
 <move>
 Bet: [How much ${opponentName}'s willing to bet for this hand, from 0 to ${poker.player2.bank} only. Zero means checking if there's no last bet, otherwise fold. ${poker.player2.bank} means going all-in.]
 Discard: [The cards in ${opponentName}'s hand that she wants replaced, separated by commas.]

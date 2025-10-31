@@ -128,19 +128,24 @@
         <button id="moveEntitiesBtn" class="stylized-button">Move</button>
         <div id="legUI">
             <div class="legend">
-                <div id="legChar" class="entityLegend"></div> <div>{{char}}</div>
+                <div id="legChar" class="entityLegend"></div>
+                <div>{{char}}</div>
             </div>
             <div class="legend">
-                <div id="legPOI" class="entityLegend"></div> <div>POI</div>
+                <div id="legPOI" class="entityLegend"></div>
+                <div>POI</div>
             </div>
             <div class="legend">
-                <div id="legCache" class="entityLegend"></div> <div>Cache</div>
+                <div id="legCache" class="entityLegend"></div>
+                <div>Cache</div>
             </div>
             <div class="legend">
-                <div id="legEnemy" class="entityLegend"></div> <div>Enemy</div>
+                <div id="legEnemy" class="entityLegend"></div>
+                <div>Enemy</div>
             </div>
             <div class="legend">
-                <div id="legBase" class="entityLegend"></div> <div>{{user}}'s bunker entrance</div>
+                <div id="legBase" class="entityLegend"></div>
+                <div>{{user}}'s bunker entrance</div>
             </div>
         </div>
     </div>
@@ -179,10 +184,6 @@
             const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
-        //user side
-        async function loadChatMessages() {
-            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
-        }
 
 
         let toJB = ""
@@ -194,6 +195,7 @@
         let chatData
         let chatDataHist
         let toUserProcess = {}
+        let entitiesMove = false
         //ai side
         function loadChatData() {
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
@@ -221,9 +223,25 @@
             chatData.swiped = swiped
             chatData.toCut = toCut
             chatData.userMesEdited = false
+            saveEntities()
             chatData.toUserProcess = toUserProcess
             chatDataHist[chatMessages.message_id] = chatData
             await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
+        }
+
+
+        function saveEntities() {
+            const entities = get("entity")
+            let entitiesToSave = []
+            entities.forEach(entity => {
+                const newEntry = {
+                    posX: entity.pos.x,
+                    posY: entity.pos.y,
+                    tags: entity.tags
+                }
+                entitiesToSave.push(newEntry)
+            });
+            chatData.toUserProcess.savedEntities = entitiesToSave
         }
 
 
@@ -261,6 +279,102 @@
 
         const ENTITY_SPEED = 1000
 
+        function newEntities() {
+            //user
+            add([
+                sprite("entity"),
+                anchor("center"),
+                scale(0.1),
+                area({
+                    scale: 1,
+                }),
+                pos(CANVAS_WIDTH / 2, CANVAS_HEIGHT - 15),
+                "entity",
+                "user"
+            ])
+
+            //char
+            add([
+                sprite("entity"),
+                scale(0.1),
+                anchor("center"),
+                area({
+                    scale: 1.5,
+                }),
+                pos(rand(15, CANVAS_WIDTH - 15), 15),
+                "entity",
+                "char",
+            ])
+
+            //weapons cache
+            let cacheCount = randi(3, 6)
+            for (let i = 0; i < cacheCount; i++) {
+                add([
+                    sprite("entity"),
+                    anchor("center"),
+                    scale(0.1),
+                    area({
+                        scale: 1,
+                    }),
+                    pos(rand(35, CANVAS_WIDTH - 35), rand(35, CANVAS_HEIGHT - 35)),
+                    "entity",
+                    "cache"
+                ])
+            }
+
+            //poi - loc, mystery
+            let poiCount = randi(1, 6)
+            for (let i = 0; i < poiCount; i++) {
+                add([
+                    sprite("entity"),
+                    anchor("center"),
+                    scale(0.1),
+                    area({
+                        scale: 1,
+                    }),
+                    pos(rand(35, CANVAS_WIDTH - 35), rand(35, CANVAS_HEIGHT - 35)),
+                    "entity",
+                    "poi"
+                ])
+            }
+
+            //enemies
+            let enemyCount = randi(10, 25)
+            for (let i = 0; i < enemyCount; i++) {
+                const enemy = add([
+                    sprite("entity"),
+                    anchor("center"),
+                    scale(0.1),
+                    area({
+                        scale: 1,
+                    }),
+                    pos(rand(15, CANVAS_WIDTH - 15), rand(CANVAS_HEIGHT / 2 - 100, CANVAS_HEIGHT / 2 + 100)),
+                    "entity",
+                    "enemy"
+                ])
+
+                enemy.tag(getRandomEnemyType())
+            }
+        }
+
+
+        function loadEntities() {
+            const entitiesToLoad = chatData.savedEntities
+            entitiesToLoad.forEach(entry => {
+                let tags = entry.tags
+                const entity = add([
+                    sprite("entity"),
+                    scale(0.1),
+                    anchor("center"),
+                    area({
+                        scale: 1,
+                    }),
+                    pos(entry.posX, entry.posY),
+                ])
+                entity.tag(tags)
+            });
+        }
+
 
         //514x485
         function initCanvas() {
@@ -286,100 +400,76 @@
                     return def_frag() * vec4(1.0, 1.0, 1.0, blink <= 0.2 ? 1.0 : 0.0);
                 }`
             )
-            //user
+            
             loadSprite("entity", "https://files.catbox.moe/astm2u.png")
-            add([
-                sprite("entity"),
-                anchor("center"),
-                scale(0.1),
-                area({
-                    scale: 1,
-                }),
-                pos(CANVAS_WIDTH / 2, CANVAS_HEIGHT - 15),
+
+            if (chatMessages.message_id === 0) {
+                newEntities()
+            }
+            else {
+                loadEntities()
+            }
+
+
+            //comp entities
+            const user = get("user")[0]
+            user.add([
                 color(32, 245, 22),
-                "entity",
-                "user"
             ])
-            //char
-            const charEnt = add([
-                sprite("entity"),
-                scale(0.1),
-                anchor("center"),
-                area({
-                    scale: 1.5,
-                }),
-                pos(rand(15, CANVAS_WIDTH - 15), 15),
+
+            const char = get("char")[0]
+            char.add([
                 shader("blinking", () => ({
                     u_time: time(),
                 })),
                 color(237, 88, 237),
-                "entity",
-                "char",
             ])
+            char.area = {
+                scale: 1.5,
+            }
 
-            onKeyDown("left", () => {
-                charEnt.move(vec2(-1 * ENTITY_SPEED * 2 * dt(), 0))
-            })
-            onKeyDown("right", () => {
-                charEnt.move(vec2(1 * ENTITY_SPEED * 2 * dt(), 0))
-            })
-            onKeyDown("up", () => {
-                charEnt.move(vec2(0, -1 * ENTITY_SPEED * 2 * dt()))
-            })
-            onKeyDown("down", () => {
-                charEnt.move(vec2(0, 1 * ENTITY_SPEED * 2 * dt()))
-            })
+            function charMove(obj) {
+                let steps = 500
+                let moving = true
 
-            //weapons cache
-            let cacheCount = randi(3, 6)
-            for (let i = 0; i < cacheCount; i++) {
-                add([
-                    sprite("entity"),
-                    anchor("center"),
-                    scale(0.1),
-                    area({
-                        scale: 1,
-                    }),
-                    pos(rand(35, CANVAS_WIDTH - 35), rand(35, CANVAS_HEIGHT - 35)),
+                return {
+                    id: "charMove",
+                    update() {
+                        if(moving && entitiesMove && steps > 0) {
+                            //get input from ai
+                            //let step = vec2(direction.x * ENTITY_SPEED * dt(), direction.y * ENTITY_SPEED * dt())
+                            obj.move(step)
+                            steps -= 1 
+                        }
+                        else if(moving && entitiesMove && steps <= 0) {
+                            moving = false
+                        }
+                    },
+                }
+            }
+
+            const caches = get("cache")
+            caches.forEach(cache => {
+                cache.add([
                     color(80, 229, 199),
-                    "entity",
-                    "cache"
                 ])
-            }
-            //poi - loc, mystery
-            let poiCount = randi(1, 6)
-            for (let i = 0; i < poiCount; i++) {
-                add([
-                    sprite("entity"),
-                    anchor("center"),
-                    scale(0.1),
-                    area({
-                        scale: 1,
-                    }),
-                    pos(rand(35, CANVAS_WIDTH - 35), rand(35, CANVAS_HEIGHT - 35)),
-                    color(229, 229, 80),
-                    "entity",
-                    "poi"
-                ])
-            }
-            //enemies - stationary, moving, invisible
-            let enemyCount = randi(10, 20)
-            for (let i = 0; i < enemyCount; i++) {
-                add([
-                    sprite("entity"),
-                    anchor("center"),
-                    scale(0.1),
-                    area({
-                        scale: 1,
-                    }),
-                    pos(rand(15, CANVAS_WIDTH - 15), rand(CANVAS_HEIGHT / 2 - 100, CANVAS_HEIGHT / 2 + 100)),
-                    color(224, 18, 39),
-                    "entity",
-                    "enemy",
-                    getRandomEnemyType()
-                ])
-            }
+            });
 
+            const pois = get("poi")
+            pois.forEach(poi => {
+                poi.add([
+                    color(229, 229, 80),
+                ])
+            });
+
+            const enemies = get("enemy")
+            enemies.forEach(enemy => {
+                enemy.add([
+                    color(224, 18, 39),
+                ])
+            });
+
+            //enemies
             const wanderSteps = [
                 50, 100, 150, 200, 250, 300
             ]
@@ -392,12 +482,12 @@
                 return {
                     id: "wander",
                     update() {
-                        if (wandering && steps > 0) {
+                        if (wandering && entitiesMove && steps > 0) {
                             let step = vec2(direction.x * ENTITY_SPEED * dt(), direction.y * ENTITY_SPEED * dt())
                             obj.move(step)
                             steps -= 1
                         }
-                        else {
+                        else if(wandering && entitiesMove && steps <= 0){
                             wandering = false
                         }
                     },
@@ -405,20 +495,20 @@
             }
 
             function track(obj) {
-                let steps = 50
+                let steps = 100
                 let tracking = true
-                let direction = charEnt.pos.sub(obj.pos)
+                let direction = get("char")[0].pos.sub(obj.pos)
                 direction = direction.unit()
 
                 return {
                     id: "track",
                     update() {
-                        if (tracking && steps > 0) {
+                        if (tracking && entitiesMove && steps > 0) {
                             let step = vec2(direction.x * ENTITY_SPEED * dt(), direction.y * ENTITY_SPEED * dt())
                             obj.move(step)
                             steps -= 1
                         }
-                        else {
+                        else if(tracking && entitiesMove && steps <= 0) {
                             tracking = false
                         }
                     },
@@ -430,9 +520,9 @@
                 return {
                     id: "cloak",
                     update() {
-                        let dist = charEnt.pos.dist(obj.pos)
+                        let dist = get("char")[0].pos.dist(obj.pos)
                         if (dist >= UNCLOAK_DIST) {
-                            obj.opacity = 0 
+                            obj.opacity = 0
                         }
                         else {
                             obj.opacity = UNCLOAK_DIST / dist
@@ -473,26 +563,34 @@
                 brute.scale = vec2(0.22)
             });
 
-            onCollide("char", "enemy", () => {
+            onCollide("char", "enemy", (char, enemy) => {
                 console.log("AAAAh")
             })
 
-            onCollide("char", "poi", () => {
+            onCollide("char", "poi", (char, poi) => {
                 console.log("interedatstng")
             })
 
-            onCollide("char", "cache", () => {
+            onCollide("char", "cache", (char, cache) => {
                 console.log("weapons ammo")
             })
 
-            onCollide("char", "user", () => {
+            onCollide("char", "user", (char, user) => {
                 console.log("finally")
             })
-        }
 
-
-        function beginMove() {
-
+            onKeyDown("left", () => {
+                get("char")[0].move(vec2(-1 * ENTITY_SPEED * 2 * dt(), 0))
+            })
+            onKeyDown("right", () => {
+                get("char")[0].move(vec2(1 * ENTITY_SPEED * 2 * dt(), 0))
+            })
+            onKeyDown("up", () => {
+                get("char")[0].move(vec2(0, -1 * ENTITY_SPEED * 2 * dt()))
+            })
+            onKeyDown("down", () => {
+                get("char")[0].move(vec2(0, 1 * ENTITY_SPEED * 2 * dt()))
+            })
         }
 
 
@@ -509,34 +607,45 @@
             "tracker",
             "invisible",
             "invisible",
-            "invisible",
-            "invisible",
-            "invisible",
             "brute"
         ]
         function getRandomEnemyType() {
-            const enemyType = enemyTypes[Math.floor(Math.random() * enemyTypes.length)]
-            return enemyType
+            let specialCount = [1, 1, 1, 1, 2, 2, 3, 3, 3, 3, 3]
+            specialCount = specialCount[Math.floor(Math.random() * specialCount.length)]
+            let outputArr = []
+            for (let i = 0; i < specialCount; i++) {
+                outputArr.push(enemyTypes[Math.floor(Math.random() * enemyTypes.length)])
+            }
+            //mimic - only 1
+            //conflicts: shambler, tracker, stationary
+            if (outputArr.indexOf("mimic") != -1) {
+                outputArr = outputArr.filter(e => e === "mimic")
+            }
+            else if (outputArr.indexOf("tracker") != -1) {
+                outputArr = outputArr.filter(e => e !== "shambler")
+                    .filter(e => e !== "stationary")
+            }
+            else if (outputArr.indexOf("shambler") != -1) {
+                outputArr = outputArr.filter(e => e !== "tracker")
+                    .filter(e => e !== "stationary")
+            }
+            else if (outputArr.indexOf("stationary") != -1) {
+                outputArr = outputArr.filter(e => e !== "tracker")
+                    .filter(e => e !== "shambler")
+            }
+            outputArr = [...new Set(outputArr)]
+            return outputArr
         }
 
 
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             //ai
-            //initError()
-            //await loadAIReply()
-
-            //user
-            //loadChatMessages()
+            initError()
+            await loadAIReply()
 
             //ai user
-            //loadChatData()
-
-            //ai
-            //intro handler - for multi intro cards
-            // if (chatMessages.message_id === 0) {
-
-            // }
+            loadChatData()
 
             //ai
             //regexes here
@@ -549,9 +658,6 @@
             //     return
             // }
 
-            //ai
-            // if (await handleSwipe()) return
-
             //user
             // if (await handleUserMesEdit()) return
 
@@ -560,7 +666,11 @@
 
             //main func start here
 
-            initCanvas()
+            //initCanvas()
+
+            moveEntitiesBtn.addEventListener("click", function() {
+                entitiesMove = true
+            })
 
 
             //ai
