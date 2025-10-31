@@ -181,21 +181,21 @@
         async function loadAIReply() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
             input = chatMessages.swipes[chatMessages.swipes.length - 1]
-            const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
+            const regexInput = /<move>([\S\s](?!<move>))+?<\/move>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
 
 
         let toJB = ""
         let gameOver
-        let swiped
-        let toCut
         let userMesEdited
-        let expectingOutputOnId
         let chatData
         let chatDataHist
         let toUserProcess = {}
         let entitiesMove = false
+        let entInMotion = []
+        let excludeOnSave = []
+        let ammoRemaining
         //ai side
         function loadChatData() {
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
@@ -204,15 +204,11 @@
                 chatData = {}
                 chatDataHist = {}
                 gameOver = false
-                swiped = false
-                toCut = true
-                expectingOutputOnId = -1
+                ammoRemaining = 30
             }
             else {
                 gameOver = chatData.gameOver
-                swiped = chatData.swiped
-                toCut = chatData.toCut
-                expectingOutputOnId = chatData.expectingOutputOnId
+                ammoRemaining = chatData.ammoRemaining
             }
         }
 
@@ -220,8 +216,6 @@
         //ai side
         async function saveData() {
             chatData.gameOver = gameOver
-            chatData.swiped = swiped
-            chatData.toCut = toCut
             chatData.userMesEdited = false
             saveEntities()
             chatData.toUserProcess = toUserProcess
@@ -234,14 +228,16 @@
             const entities = get("entity")
             let entitiesToSave = []
             entities.forEach(entity => {
+                if (excludeOnSave.includes(entity.id)) {
+                    return
+                }
                 const newEntry = {
-                    posX: entity.pos.x,
-                    posY: entity.pos.y,
+                    pos: entity.pos.serialize(),
                     tags: entity.tags
                 }
                 entitiesToSave.push(newEntry)
             });
-            chatData.toUserProcess.savedEntities = entitiesToSave
+            toUserProcess.savedEntities = entitiesToSave
         }
 
 
@@ -254,28 +250,24 @@
 
             const mesId = chatMessages.message_id
 
-            if (expectingOutputOnId === mesId && input == "") {
-                main_cont.style.display = "none"
-                error.style.display = "flex"
-                return false
-            }
-
             for (const element of toVerify) {
-                if (expectingOutputOnId === mesId && element == "") {
+                if (element === "") {
+                    console.log("here")
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
                 }
             }
 
-            if (mesId === 0 || expectingOutputOnId != mesId) {
+            if (input == "") {
+                console.log("here")
                 main_cont.style.display = "none"
-                error.style.display = "none"
+                error.style.display = "flex"
+                return false
             }
 
             return true
         }
-
 
         const ENTITY_SPEED = 1000
 
@@ -359,9 +351,7 @@
 
 
         function loadEntities() {
-            const entitiesToLoad = chatData.savedEntities
-            entitiesToLoad.forEach(entry => {
-                let tags = entry.tags
+            chatData.savedEntities.forEach(entry => {
                 const entity = add([
                     sprite("entity"),
                     scale(0.1),
@@ -369,15 +359,15 @@
                     area({
                         scale: 1,
                     }),
-                    pos(entry.posX, entry.posY),
+                    pos(entry.pos.x, entry.pos.y),
                 ])
-                entity.tag(tags)
+                entity.tag(entry.tags)
             });
         }
 
 
         //514x485
-        function initCanvas() {
+        function initCanvas(aiMove) {
             //background
             loadSprite("bg", "https://files.catbox.moe/17ru8j.jpg")
             add([
@@ -400,7 +390,7 @@
                     return def_frag() * vec4(1.0, 1.0, 1.0, blink <= 0.2 ? 1.0 : 0.0);
                 }`
             )
-            
+
             loadSprite("entity", "https://files.catbox.moe/astm2u.png")
 
             if (chatMessages.message_id === 0) {
@@ -410,122 +400,172 @@
                 loadEntities()
             }
 
-
             //comp entities
             const user = get("user")[0]
-            user.add([
-                color(32, 245, 22),
-            ])
+            user.use(color(32, 245, 22))
 
-            const char = get("char")[0]
-            char.add([
-                shader("blinking", () => ({
-                    u_time: time(),
-                })),
-                color(237, 88, 237),
-            ])
-            char.area = {
-                scale: 1.5,
-            }
-
-            function charMove(obj) {
+            function charMove() {
                 let steps = 500
                 let moving = true
+                let v
+                aiMove = aiMove.toLowerCase()
+                switch (aiMove) {
+                    case "wait":
+                        v = vec2(0, 0)
+                        steps = 0
+                        break
+                    case "n":
+                        v = vec2(0, -1)
+                        break
+                    case "e":
+                        v = vec2(1, 0)
+                        break
+                    case "w":
+                        v = vec2(-1, 0)
+                        break
+                    case "s":
+                        v = vec2(0, 1)
+                        break
+                    case "ne":
+                        v = vec2(1, -1).unit()
+                        break
+                    case "nw":
+                        v = vec2(-1, -1).unit()
+                        break
+                    case "se":
+                        v = vec2(1, 1).unit()
+                        break
+                    case "sw":
+                        v = vec2(-1, 1).unit()
+                        break
+                }
 
                 return {
                     id: "charMove",
-                    update() {
-                        if(moving && entitiesMove && steps > 0) {
+                    add() {
+                        entInMotion.push(this.id)
+                    },
+                    async update() {
+                        if (moving && entitiesMove && steps > 0) {
                             //get input from ai
-                            //let step = vec2(direction.x * ENTITY_SPEED * dt(), direction.y * ENTITY_SPEED * dt())
-                            obj.move(step)
-                            steps -= 1 
+                            let step = vec2(v.x * ENTITY_SPEED * dt(), v.y * ENTITY_SPEED * dt())
+                            if (this.pos.x <= 5 || this.pos.x >= CANVAS_WIDTH - 5 || this.pos.y <= 5 || this.pos.y >= CANVAS_HEIGHT - 5) {
+                                this.move(step.x * -1, step.y * -1)
+                            }
+                            else {
+                                this.move(step)
+                            }
+                            steps -= 1
                         }
-                        else if(moving && entitiesMove && steps <= 0) {
+                        else if (moving && entitiesMove && steps <= 0) {
                             moving = false
+                            entInMotion = entInMotion.filter(ent => ent !== this.id)
                         }
                     },
                 }
             }
 
+            const char = get("char")[0]
+            char.use(charMove(char))
+            char.use(shader("blinking", () => ({
+                u_time: time(),
+            })))
+            char.use(color(237, 88, 237))
+            char.area.scale = 1.5
+
             const caches = get("cache")
             caches.forEach(cache => {
-                cache.add([
-                    color(80, 229, 199),
-                ])
+                cache.use(color(80, 229, 199))
             });
 
             const pois = get("poi")
             pois.forEach(poi => {
-                poi.add([
-                    color(229, 229, 80),
-                ])
+                poi.use(color(229, 229, 80))
             });
 
             const enemies = get("enemy")
             enemies.forEach(enemy => {
-                enemy.add([
-                    color(224, 18, 39),
-                ])
+                enemy.use(color(224, 18, 39))
             });
 
             //enemies
-            const wanderSteps = [
-                50, 100, 150, 200, 250, 300
-            ]
-
-            function wander(obj) {
+            function wander() {
+                const wanderSteps = [
+                    0, 0, 0, 100, 200, 300
+                ]
                 let steps = wanderSteps[Math.floor(Math.random() * wanderSteps.length)]
-                let wandering = Math.random() > .5 ? true : false
-                let direction = vec2(randi(-1, 2), randi(-1, 2)).unit()
+                let wandering = true
+                let v = vec2(randi(-1, 2), randi(-1, 2)).unit()
 
                 return {
                     id: "wander",
-                    update() {
+                    add() {
+                        entInMotion.push(this.id)
+                    },
+                    async update() {
                         if (wandering && entitiesMove && steps > 0) {
-                            let step = vec2(direction.x * ENTITY_SPEED * dt(), direction.y * ENTITY_SPEED * dt())
-                            obj.move(step)
+                            let step = vec2(v.x * ENTITY_SPEED * dt(), v.y * ENTITY_SPEED * dt())
+                            if (this.pos.x <= 5 || this.pos.x >= CANVAS_WIDTH - 5 || this.pos.y <= 5 || this.pos.y >= CANVAS_HEIGHT - 5) {
+                                this.move(step.x * -1, step.y * -1)
+                            }
+                            else {
+                                this.move(step)
+                            }
                             steps -= 1
                         }
-                        else if(wandering && entitiesMove && steps <= 0){
+                        else if (wandering && entitiesMove && steps <= 0) {
                             wandering = false
+                            entInMotion = entInMotion.filter(ent => ent !== this.id)
                         }
                     },
                 }
             }
 
-            function track(obj) {
-                let steps = 100
+            function track() {
+                let steps = 200
                 let tracking = true
-                let direction = get("char")[0].pos.sub(obj.pos)
-                direction = direction.unit()
+                let v
 
                 return {
                     id: "track",
-                    update() {
+                    add() {
+                        entInMotion.push(this.id)
+                        let ch = get("char")[0]
+                        v = ch.pos.sub(this.pos).unit()
+                    },
+                    async update() {
                         if (tracking && entitiesMove && steps > 0) {
-                            let step = vec2(direction.x * ENTITY_SPEED * dt(), direction.y * ENTITY_SPEED * dt())
-                            obj.move(step)
+                            let step = vec2(v.x * ENTITY_SPEED * dt(), v.y * ENTITY_SPEED * dt())
+                            if (this.pos.x <= 5 || this.pos.x >= CANVAS_WIDTH - 5 || this.pos.y <= 5 || this.pos.y >= CANVAS_HEIGHT - 5) {
+                                this.move(step.x * -1, step.y * -1)
+                            }
+                            else {
+                                this.move(step)
+                            }
                             steps -= 1
                         }
-                        else if(tracking && entitiesMove && steps <= 0) {
+                        else if (tracking && entitiesMove && steps <= 0) {
                             tracking = false
+                            entInMotion = entInMotion.filter(ent => ent !== this.id)
                         }
                     },
                 }
             }
 
             const UNCLOAK_DIST = 60
-            function cloak(obj) {
+            function cloak() {
                 return {
                     id: "cloak",
+                    add() {
+                        this.opacity = 0
+                    },
                     update() {
-                        let dist = get("char")[0].pos.dist(obj.pos)
+                        let dist = get("char")[0].pos.dist(this.pos)
                         if (dist >= UNCLOAK_DIST) {
-                            obj.opacity = 0
+                            this.opacity = 0
                         }
                         else {
-                            obj.opacity = UNCLOAK_DIST / dist
+                            this.opacity = UNCLOAK_DIST / dist
                         }
                     },
                 }
@@ -539,23 +579,17 @@
 
             const shamblers = get("shambler")
             shamblers.forEach(shambler => {
-                shambler.add([
-                    wander(shambler)
-                ])
+                shambler.use(wander())
             });
 
             const trackers = get("tracker")
             trackers.forEach(tracker => {
-                tracker.add([
-                    track(tracker)
-                ])
+                tracker.use(track())
             });
 
             const invisibles = get("invisible")
             invisibles.forEach(invisible => {
-                invisible.add([
-                    cloak(invisible)
-                ])
+                invisible.use(cloak())
             })
 
             const brutes = get("brute")
@@ -564,32 +598,40 @@
             });
 
             onCollide("char", "enemy", (char, enemy) => {
-                console.log("AAAAh")
+                excludeOnSave.push(enemy.id)
+                enemy.use(shader("blinking", () => ({
+                    u_time: time(),
+                })))
+
+                
             })
 
             onCollide("char", "poi", (char, poi) => {
-                console.log("interedatstng")
+                excludeOnSave.push(poi.id)
+                poi.use(shader("blinking", () => ({
+                    u_time: time(),
+                })))
+
+                toJB += `
+`
             })
 
             onCollide("char", "cache", (char, cache) => {
-                console.log("weapons ammo")
+                excludeOnSave.push(cache.id)
+                cache.use(shader("blinking", () => ({
+                    u_time: time(),
+                })))
+
+
             })
 
             onCollide("char", "user", (char, user) => {
-                console.log("finally")
-            })
+                gameOver = true
+                user.use(shader("blinking", () => ({
+                    u_time: time(),
+                })))
 
-            onKeyDown("left", () => {
-                get("char")[0].move(vec2(-1 * ENTITY_SPEED * 2 * dt(), 0))
-            })
-            onKeyDown("right", () => {
-                get("char")[0].move(vec2(1 * ENTITY_SPEED * 2 * dt(), 0))
-            })
-            onKeyDown("up", () => {
-                get("char")[0].move(vec2(0, -1 * ENTITY_SPEED * 2 * dt()))
-            })
-            onKeyDown("down", () => {
-                get("char")[0].move(vec2(0, 1 * ENTITY_SPEED * 2 * dt()))
+
             })
         }
 
@@ -610,7 +652,7 @@
             "brute"
         ]
         function getRandomEnemyType() {
-            let specialCount = [1, 1, 1, 1, 2, 2, 3, 3, 3, 3, 3]
+            let specialCount = [1, 1, 1, 1, 2, 2, 3, 3]
             specialCount = specialCount[Math.floor(Math.random() * specialCount.length)]
             let outputArr = []
             for (let i = 0; i < specialCount; i++) {
@@ -649,34 +691,37 @@
 
             //ai
             //regexes here
-            // const regexVar = /regex/i
-            // const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
+            const regexMove = /[NS][EW]?|wait/i
+            const aiMove = regexMove.test(input) ? input.match(regexMove)[0] : ""
+            const regexAmmoCount = /\d+/i
+            let ammoCount = regexAmmoCount.test(input) ? input.match(regexAmmoCount)[0] : ""
+            console.log(aiMove)
+            ammoCount = parseInt(ammoCount)
 
-            // const toVerify = []
-            // if (verifyInputs(toVerify) === false) {
-            //     await saveData()
-            //     return
-            // }
-
-            //user
-            // if (await handleUserMesEdit()) return
-
-            //user
-            // await loadChatMessages()
+            const toVerify = [aiMove, ammoCount]
+            if (verifyInputs(toVerify) === false) {
+                await saveData()
+                return
+            }
 
             //main func start here
-
-            //initCanvas()
-
-            moveEntitiesBtn.addEventListener("click", function() {
+            ammoRemaining -= ammoCount
+            initCanvas(aiMove)
+            moveEntitiesBtn.addEventListener("click", function () {
                 entitiesMove = true
+                moveEntitiesBtn.style.visibility = "hidden"
             })
-
+            onUpdate(async () => {
+                if (entInMotion.length <= 0 && entitiesMove) {
+                    entitiesMove = false
+                    saveData()
+                }
+            })
 
             //ai
             prepToUserProcess()
-            // updateJB()
-            // saveData()
+            updateJB()
+            saveData()
             document.querySelector("body").style.height = "fit-content"
         })
 
@@ -684,6 +729,7 @@
         //ai side
         function prepToUserProcess() {
             //process stuff to be updated on user side
+            toUserProcess.ammoRemaining = ammoRemaining
 
         }
 

@@ -1,0 +1,158 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://unpkg.com/kaplay@4000.0.0-alpha.22/dist/kaplay.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            margin: 0;
+            width: 100%;
+            height: fit-content;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+
+        canvas {
+            margin: 0 auto;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(184, 48, 48);
+        }
+
+        .stylized-button {
+            color: white;
+            padding: 3px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .stylized-button:hover {
+            transform: scale(1.05);
+        }
+
+        .stylized-button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not generate the expected output. Please swipe or regenerate. If this is the intro, you
+            should ignore this.
+        </div>
+        <button class="stylized-button" id="ignore_btn">Ignore</button>
+    </div>
+    <div id="main_cont"></div>
+
+    <script>
+        const main_cont = document.getElementById("main_cont")
+
+
+        //user side
+        async function loadChatMessages() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+        }
+
+
+        let gameOver
+        let userMesEdited
+        let chatData
+        let chatDataHist
+        //user side
+        function loadChatData() {
+            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist[chatMessages.message_id-1]
+            gameOver = chatData.gameOver
+            userMesEdited = chatData.userMesEdited
+        }
+
+
+        //user side
+        const MAX_CHATDATA_HISTORY = 20
+        async function saveData() {
+            chatData.gameOver = gameOver
+            chatData.userMesEdited = userMesEdited
+            chatData.savedEntities = chatData.toUserProcess.savedEntities
+            chatData.ammoRemaining = chatData.toUserProcess.ammoRemaining
+            chatData.toUserProcess = {}
+            chatDataHist[chatMessages.message_id] = chatData
+            const keys = Object.keys(chatDataHist)
+            const diff = keys.length - MAX_CHATDATA_HISTORY
+            if(keys.length > MAX_CHATDATA_HISTORY) {
+                for(let i = 0; i < diff; i++) {
+                    delete chatDataHist[keys[i]]
+                }
+            }
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
+        }
+
+
+        //user side
+        async function handleUserMesEdit() {
+            if (userMesEdited) {
+                main_cont.parentNode.removeChild(main_cont)
+                await saveData()
+                return true
+            }
+            userMesEdited = true
+            return false
+        }
+
+
+        //main
+        document.addEventListener("DOMContentLoaded", async function () {
+            //user
+            await loadChatMessages()
+            
+            //ai user
+            loadChatData()
+
+            //user
+            if (await handleUserMesEdit()) return
+
+            //main func start here
+
+            saveData()
+        })
+    </script>
+</body>
+
+</html>
+```
