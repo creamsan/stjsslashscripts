@@ -622,7 +622,7 @@
                     u_time: time(),
                 })))
 
-                toJB += `- {{char}} is now face to face with a fog creature.
+                toJB = `- {{char}} is now face to face with a fog creature.
 - {{char}} has ${ammoRemaining} ammo remaining. She must use some of them or she dies.
 `
                 if (enemy.is("mimic")) {
@@ -643,6 +643,7 @@
 
                 entitiesMove = false
                 entInMotion = []
+                prepToUserProcess("")
                 updateJB()
                 saveData()
             })
@@ -653,10 +654,11 @@
                     u_time: time(),
                 })))
 
-                toJB += `- {{char}} finds something. It's {{random::a trinket::a human corpse holding something.::a creature's corpse with something in it.::a strange mark.::something weird she cannot explain.}}
+                toJB = `- {{char}} finds something. It's {{random::a trinket::a human corpse holding something.::a creature's corpse with something in it.::a strange mark.::something weird she cannot explain.}}
 `
                 entitiesMove = false
                 entInMotion = []
+                prepToUserProcess("- NO fog creatures in {{char}}'s sight yet.")
                 updateJB()
                 saveData()
             })
@@ -670,11 +672,11 @@
                 let ammoInc = [5, 10, 15, 20, 30, 40, 50]
                 ammoInc = ammoInc[Math.floor(Math.random() * ammoInc.length)]
                 ammoRemaining += ammoInc
-                toJB += `- {{char}} finds a scavenged weapon's cache. Ammo count: +${ammoInc}. Her ammo reserves are now at ${ammoRemaining}.
+                toJB = `- {{char}} finds a scavenged weapon's cache. Ammo count: +${ammoInc}. Her ammo reserves are now at ${ammoRemaining}.
 `
                 entitiesMove = false
                 entInMotion = []
-                prepToUserProcess()
+                prepToUserProcess("- NO fog creatures in {{char}}'s sight yet.")
                 updateJB()
                 saveData()
             })
@@ -685,7 +687,7 @@
                     u_time: time(),
                 })))
 
-                toJB += `- {{char}} finally reached the bunker.
+                toJB = `- {{char}} finally reached the bunker.
 `
                 entitiesMove = false
                 entInMotion = []
@@ -779,7 +781,7 @@
             })
 
             //ai
-            prepToUserProcess()
+            prepToUserProcess("- NO fog creatures in {{char}}'s sight yet.")
             updateJB()
             saveData()
             document.querySelector("body").style.height = "fit-content"
@@ -787,14 +789,16 @@
 
 
         //ai side
-        function prepToUserProcess() {
+        function prepToUserProcess(prepend) {
             //process stuff to be updated on user side
             toUserProcess.ammoRemaining = Math.max(0, ammoRemaining)
 
             if (gameOver) {
                 return
             }
-            toJB += `- Only a radio connects {{user}} and {{char}}.
+            toJB += `${prepend}
+- Only a radio connects {{user}} and {{char}}.
+- {{user}} has a radar that can map the creature's movements. This intel is only available to {{char}} through {{user}}.
 - {{user}} cannot see what {{char}} is doing. Describe the sounds that can be heard in the radio immersively through narration and the way in which {{char}} describes what she can see through dialogue.
 - Focus only on the surroundings of {{char}}.
 - At the end {{char}}'s response, please include the following:
