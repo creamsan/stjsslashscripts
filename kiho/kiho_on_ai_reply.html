@@ -629,11 +629,14 @@
                     toJB += `- The fog creature is mimicking a weapon crate and now revealed its true appearance.
 `
                 }
-                else if (enemy.is("brute")) {
+                if (enemy.is("brute")) {
                     toJB += `- The fog creature is some kind of brute. Gigantic and tough. She'll have to use all her ammo to take this creature down.
 `
                 }
-
+                if(enemy.is("invisible")){
+                    toJB += `- The fog creature has an ability to remain invisible in {{user}}'s radar.
+`
+                }
                 if (ammoRemaining === 0) {
                     gameOver = true
                     toJB += `- {{char}} ran out of ammo, she cannot escape nor fight the creature hand to hand.
@@ -798,7 +801,7 @@
             }
             toJB += `${prepend}
 - Only a radio connects {{user}} and {{char}}.
-- {{user}} has a radar that can map the creature's movements. This intel is only available to {{char}} through {{user}}.
+- {{user}} has a radar that can map the creature's movements. This intel is only available through {{user}}. As such, you cannot make up your own encounter for {{char}}.
 - {{user}} cannot see what {{char}} is doing. Describe the sounds that can be heard in the radio immersively through narration and the way in which {{char}} describes what she can see through dialogue.
 - Focus only on the surroundings of {{char}}.
 - At the end {{char}}'s response, please include the following:
