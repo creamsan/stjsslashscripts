@@ -141,7 +141,7 @@
             </div>
             <div class="legend">
                 <div id="legEnemy" class="entityLegend"></div>
-                <div>Enemy</div>
+                <div>Fog creature</div>
             </div>
             <div class="legend">
                 <div id="legBase" class="entityLegend"></div>
@@ -204,7 +204,7 @@
                 chatData = {}
                 chatDataHist = {}
                 gameOver = false
-                ammoRemaining = 30
+                ammoRemaining = 20
             }
             else {
                 gameOver = chatData.gameOver
@@ -244,7 +244,10 @@
         //ai side
         function verifyInputs(toVerify) {
             if (gameOver) {
+                game.parentNode.removeChild(game)
                 main_cont.parentNode.removeChild(main_cont)
+                updateJB()
+                saveData()
                 return false
             }
 
@@ -252,15 +255,13 @@
 
             for (const element of toVerify) {
                 if (element === "") {
-                    console.log("here")
                     main_cont.style.display = "none"
                     error.style.display = "flex"
                     return false
                 }
             }
 
-            if (input == "") {
-                console.log("here")
+            if (input === "") {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 return false
@@ -405,47 +406,48 @@
             user.use(color(32, 245, 22))
 
             function charMove() {
-                let steps = 500
+                let steps = 200
                 let moving = true
                 let v
-                aiMove = aiMove.toLowerCase()
-                switch (aiMove) {
-                    case "wait":
-                        v = vec2(0, 0)
-                        steps = 0
-                        break
-                    case "n":
-                        v = vec2(0, -1)
-                        break
-                    case "e":
-                        v = vec2(1, 0)
-                        break
-                    case "w":
-                        v = vec2(-1, 0)
-                        break
-                    case "s":
-                        v = vec2(0, 1)
-                        break
-                    case "ne":
-                        v = vec2(1, -1).unit()
-                        break
-                    case "nw":
-                        v = vec2(-1, -1).unit()
-                        break
-                    case "se":
-                        v = vec2(1, 1).unit()
-                        break
-                    case "sw":
-                        v = vec2(-1, 1).unit()
-                        break
-                }
 
                 return {
                     id: "charMove",
                     add() {
                         entInMotion.push(this.id)
+                        aiMove = aiMove.toLowerCase().trim()
+                        switch (aiMove) {
+                            case "wait":
+                                v = vec2(0, 0)
+                                steps = 0
+                                break
+                            case "n":
+                                v = vec2(0, -1)
+                                break
+                            case "e":
+                                v = vec2(1, 0)
+                                break
+                            case "w":
+                                v = vec2(-1, 0)
+                                break
+                            case "s":
+                                v = vec2(0, 1)
+                                break
+                            case "ne":
+                                v = vec2(1, -1).unit()
+                                break
+                            case "nw":
+                                v = vec2(-1, -1).unit()
+                                break
+                            case "se":
+                                v = vec2(1, 1).unit()
+                                break
+                            case "sw":
+                                v = vec2(-1, 1).unit()
+                                break
+                            default: console.error("No direction detected.")
+                        }
                     },
-                    async update() {
+                    update() {
                         if (moving && entitiesMove && steps > 0) {
                             //get input from ai
                             let step = vec2(v.x * ENTITY_SPEED * dt(), v.y * ENTITY_SPEED * dt())
@@ -459,7 +461,12 @@
                         }
                         else if (moving && entitiesMove && steps <= 0) {
                             moving = false
+                            steps = 0
                             entInMotion = entInMotion.filter(ent => ent !== this.id)
+                        }
+                        else if(entInMotion.length === 0) {
+                            moving = false
+                            steps = 0
                         }
                     },
                 }
@@ -471,7 +478,9 @@
                 u_time: time(),
             })))
             char.use(color(237, 88, 237))
-            char.area.scale = 1.5
+            char.use(area({
+                scale: 1.5,
+            }))
 
             const caches = get("cache")
             caches.forEach(cache => {
@@ -491,7 +500,7 @@
             //enemies
             function wander() {
                 const wanderSteps = [
-                    0, 0, 0, 100, 200, 300
+                    0, 0, 0, 100, 200, 300, 400
                 ]
                 let steps = wanderSteps[Math.floor(Math.random() * wanderSteps.length)]
                 let wandering = true
@@ -502,7 +511,7 @@
                     add() {
                         entInMotion.push(this.id)
                     },
-                    async update() {
+                    update() {
                         if (wandering && entitiesMove && steps > 0) {
                             let step = vec2(v.x * ENTITY_SPEED * dt(), v.y * ENTITY_SPEED * dt())
                             if (this.pos.x <= 5 || this.pos.x >= CANVAS_WIDTH - 5 || this.pos.y <= 5 || this.pos.y >= CANVAS_HEIGHT - 5) {
@@ -515,7 +524,12 @@
                         }
                         else if (wandering && entitiesMove && steps <= 0) {
                             wandering = false
+                            steps = 0
                             entInMotion = entInMotion.filter(ent => ent !== this.id)
+                        }
+                        else if(entInMotion.length === 0) {
+                            wandering = false
+                            steps = 0
                         }
                     },
                 }
@@ -533,7 +547,7 @@
                         let ch = get("char")[0]
                         v = ch.pos.sub(this.pos).unit()
                     },
-                    async update() {
+                    update() {
                         if (tracking && entitiesMove && steps > 0) {
                             let step = vec2(v.x * ENTITY_SPEED * dt(), v.y * ENTITY_SPEED * dt())
                             if (this.pos.x <= 5 || this.pos.x >= CANVAS_WIDTH - 5 || this.pos.y <= 5 || this.pos.y >= CANVAS_HEIGHT - 5) {
@@ -546,7 +560,12 @@
                         }
                         else if (tracking && entitiesMove && steps <= 0) {
                             tracking = false
+                            steps = 0
                             entInMotion = entInMotion.filter(ent => ent !== this.id)
+                        }
+                        else if(entInMotion.length === 0) {
+                            tracking = false
+                            steps = 0
                         }
                     },
                 }
@@ -603,7 +622,29 @@
                     u_time: time(),
                 })))
 
-                
+                toJB += `- {{char}} is now face to face with a fog creature.
+- {{char}} has ${ammoRemaining} ammo remaining. She must use some of them or she dies.
+`
+                if (enemy.is("mimic")) {
+                    toJB += `- The fog creature is mimicking a weapon crate and now revealed its true appearance.
+`
+                }
+                else if (enemy.is("brute")) {
+                    toJB += `- The fog creature is some kind of brute. Gigantic and tough. She'll have to use all her ammo to take this creature down.
+`
+                }
+
+                if (ammoRemaining === 0) {
+                    gameOver = true
+                    toJB += `- {{char}} ran out of ammo, she cannot escape nor fight the creature hand to hand.
+- She dies in this encounter. Game over.
+`
+                }
+
+                entitiesMove = false
+                entInMotion = []
+                updateJB()
+                saveData()
             })
 
             onCollide("char", "poi", (char, poi) => {
@@ -612,8 +653,12 @@
                     u_time: time(),
                 })))
 
-                toJB += `
+                toJB += `- {{char}} finds something. It's {{random::a trinket::a human corpse holding something.::a creature's corpse with something in it.::a strange mark.::something weird she cannot explain.}}
 `
+                entitiesMove = false
+                entInMotion = []
+                updateJB()
+                saveData()
             })
 
             onCollide("char", "cache", (char, cache) => {
@@ -622,7 +667,16 @@
                     u_time: time(),
                 })))
 
-
+                let ammoInc = [5, 10, 15, 20, 30, 40, 50]
+                ammoInc = ammoInc[Math.floor(Math.random() * ammoInc.length)]
+                ammoRemaining += ammoInc
+                toJB += `- {{char}} finds a scavenged weapon's cache. Ammo count: +${ammoInc}. Her ammo reserves are now at ${ammoRemaining}.
+`
+                entitiesMove = false
+                entInMotion = []
+                prepToUserProcess()
+                updateJB()
+                saveData()
             })
 
             onCollide("char", "user", (char, user) => {
@@ -631,7 +685,12 @@
                     u_time: time(),
                 })))
 
-
+                toJB += `- {{char}} finally reached the bunker.
+`
+                entitiesMove = false
+                entInMotion = []
+                updateJB()
+                saveData()
             })
         }
 
@@ -640,15 +699,16 @@
             "stationary",
             "stationary",
             "stationary",
-            "stationary",
-            "stationary",
             "mimic",
             "shambler",
             "shambler",
             "shambler",
             "tracker",
+            "tracker",
+            "tracker",
             "invisible",
             "invisible",
+            "brute",
             "brute"
         ]
         function getRandomEnemyType() {
@@ -691,18 +751,18 @@
 
             //ai
             //regexes here
-            const regexMove = /[NS][EW]?|wait/i
+            const regexMove = /[NEWS]\s|[NS][EW]\s|wait/i
             const aiMove = regexMove.test(input) ? input.match(regexMove)[0] : ""
             const regexAmmoCount = /\d+/i
             let ammoCount = regexAmmoCount.test(input) ? input.match(regexAmmoCount)[0] : ""
-            console.log(aiMove)
-            ammoCount = parseInt(ammoCount)
 
             const toVerify = [aiMove, ammoCount]
             if (verifyInputs(toVerify) === false) {
                 await saveData()
                 return
             }
+
+            ammoCount = parseInt(ammoCount)
 
             //main func start here
             ammoRemaining -= ammoCount
@@ -711,7 +771,7 @@
                 entitiesMove = true
                 moveEntitiesBtn.style.visibility = "hidden"
             })
-            onUpdate(async () => {
+            onUpdate(() => {
                 if (entInMotion.length <= 0 && entitiesMove) {
                     entitiesMove = false
                     saveData()
@@ -729,15 +789,42 @@
         //ai side
         function prepToUserProcess() {
             //process stuff to be updated on user side
-            toUserProcess.ammoRemaining = ammoRemaining
+            toUserProcess.ammoRemaining = Math.max(0, ammoRemaining)
 
+            if (gameOver) {
+                return
+            }
+            toJB += `- Only a radio connects {{user}} and {{char}}.
+- {{user}} cannot see what {{char}} is doing. Describe the sounds that can be heard in the radio immersively through narration and the way in which {{char}} describes what she can see through dialogue.
+- Focus only on the surroundings of {{char}}.
+- At the end {{char}}'s response, please include the following:
+<move>
+[Direction {{char}} will move next]
+[Ammo count used for this encounter]
+</move>
+
+- The directions are N (north), E (east), W (west), S (south), NE (northeast), NW (northwest), SE (southeast) and SW (southwest), which are represented by the first letter of the direction names. Put 'Wait' if she remains still.
+- Ammo count used is a number. Range from 0 to ${ammoRemaining}.
+
+- Here's an example, where {{char}} will move south and hasn't used any ammo.
+<move>
+S
+0
+</move>
+
+- Another example, where {{char}} will remain still and shoots her gun 5 times.
+<move>
+Wait
+5
+</move>
+`
         }
 
 
         //ai side
         async function updateJB() {
             await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
+            //toJB = ""
         }
     </script>
 </body>
