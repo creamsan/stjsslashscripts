@@ -85,7 +85,6 @@
         const main_cont = document.getElementById("main_cont")
 
 
-        //ai side
         const error = document.getElementById("error")
         function initError() {
             const error_msg = document.getElementById("error_msg")
@@ -97,7 +96,6 @@
         }
 
 
-        //ai side
         let chatMessages
         let input
         async function loadAIReply() {
@@ -105,10 +103,6 @@
             input = chatMessages.swipes[chatMessages.swipes.length - 1]
             const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
             input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
-        }
-        //user side
-        async function loadChatMessages() {
-            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
         }
 
 
@@ -121,7 +115,6 @@
         let chatData
         let chatDataHist
         let toUserProcess = {}
-        //ai side
         function loadChatData() {
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
             chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id-1]
@@ -140,16 +133,8 @@
                 expectingOutputOnId = chatData.expectingOutputOnId
             }
         }
-        //user side
-        function loadChatData() {
-            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
-            chatData = chatDataHist[chatMessages.message_id-1]
-            gameOver = chatData.gameOver
-            userMesEdited = chatData.userMesEdited
-        }
 
 
-        //ai side
         async function saveData() {
             chatData.gameOver = gameOver
             chatData.swiped = swiped
@@ -161,27 +146,6 @@
         }
 
 
-        //user side
-        const MAX_CHATDATA_HISTORY = 20
-        async function saveData() {
-            chatData.gameOver = gameOver
-            chatData.swiped = false
-            chatData.toCut = true
-            chatData.expectingOutputOnId = toUserProcess.expectingOutputOnId === "next" ? Number.parseInt(chatMessages.message_id) + 1 : -1
-            chatData.userMesEdited = userMesEdited
-            chatDataHist[chatMessages.message_id] = chatData
-            const keys = Object.keys(chatDataHist)
-            const diff = keys.length - MAX_CHATDATA_HISTORY
-            if(keys.length > MAX_CHATDATA_HISTORY) {
-                for(let i = 0; i < diff; i++) {
-                    delete chatDataHist[keys[i]]
-                }
-            }
-            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
-        }
-
-
-        //ai side
         function verifyInputs(toVerify) {
             if (gameOver) {
                 main_cont.parentNode.removeChild(main_cont)
@@ -213,7 +177,6 @@
         }
 
 
-        //ai side
         async function handleSwipe() {
             eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
                 //change some data and save everything before swipe
@@ -230,18 +193,6 @@
                 input = swipeGen
                 swiped = false
             }
-            return false
-        }
-
-
-        //user side
-        async function handleUserMesEdit() {
-            if (userMesEdited) {
-                main_cont.parentNode.removeChild(main_cont)
-                await saveData()
-                return true
-            }
-            userMesEdited = true
             return false
         }
 
@@ -265,23 +216,15 @@ ${origInput}
 
         //main
         document.addEventListener("DOMContentLoaded", async function () {
-            //ai
             initError()
             await loadAIReply()
-
-            //user
-            loadChatMessages()
-
-            //ai user
             loadChatData()
 
-            //ai
             //intro handler - for multi intro cards
             if (chatMessages.message_id === 0) {
 
             }
 
-            //ai
             //regexes here
             const regexVar = /regex/i
             const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
@@ -292,11 +235,8 @@ ${origInput}
                 return
             }
 
-            //ai
             if (await handleSwipe()) return
 
-            //user
-            if (await handleUserMesEdit()) return
 
             //main func start here
 
@@ -319,6 +259,7 @@ ${origInput}
             await insertOrAssignVariables({ jbout: toJB })
             toJB = ""
         }
+
     </script>
 </body>
 
