@@ -83,8 +83,6 @@
 
     <script>
         const main_cont = document.getElementById("main_cont")
-        const game = document.querySelector("canvas")
-        game.parentNode.removeChild(game)
 
 
         const error = document.getElementById("error")
@@ -103,15 +101,15 @@
         async function loadAIReply() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
             input = chatMessages.swipes[chatMessages.swipes.length - 1]
-            const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
-            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+            // const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
+            // input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
 
 
         let toJB = ""
         let gameOver
         let swiped
-        let toCut
+        let aiMesChanged
         let userMesEdited
         let expectingOutputOnId
         let chatData
@@ -125,13 +123,13 @@
                 chatDataHist = {}
                 gameOver = false
                 swiped = false
-                toCut = true
+                aiMesChanged = false
                 expectingOutputOnId = -1
             }
             else {
                 gameOver = chatData.gameOver
                 swiped = chatData.swiped
-                toCut = chatData.toCut
+                aiMesChanged = chatData.aiMesChanged
                 expectingOutputOnId = chatData.expectingOutputOnId
             }
         }
@@ -140,7 +138,7 @@
         async function saveData() {
             chatData.gameOver = gameOver
             chatData.swiped = swiped
-            chatData.toCut = toCut
+            chatData.aiMesChanged = aiMesChanged
             chatData.userMesEdited = false
             chatData.toUserProcess = toUserProcess
             chatDataHist[chatMessages.message_id] = chatData
@@ -201,10 +199,9 @@
 
         function modifyAIMes(msg, origMsg) {
             // note: hacky - fix later 
-            // send the modified AI message
-            // send the orig AI message as hidden
-            // hide the modified AI message
             // cut the unmodified ai message
+            // display the modified AI message
+            // hide the orig AI message
             if (aiMesChanged === false) {
                 aiMesChanged = true
                 triggerSlash(`/sendas name="{{char}}" ${msg} |
@@ -225,24 +222,24 @@ ${origMsg}
             loadChatData()
 
             //intro handler - for multi intro cards
-            if (chatMessages.message_id === 0) {
+            // if (chatMessages.message_id === 0) {
 
-            }
+            // }
 
             //regexes here
-            const regexVar = /regex/i
-            const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
+            // const regexVar = /regex/i
+            // const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
 
-            const toVerify = []
-            if (verifyInputs(toVerify) === false) {
-                await saveData()
-                return
-            }
+            // const toVerify = []
+            // if (verifyInputs(toVerify) === false) {
+            //     await saveData()
+            //     return
+            // }
 
-            if (await handleSwipe()) return
-
+            // if (await handleSwipe()) return
 
             //main func start here
+            modifyAIMes("dodododo", input)
 
 
             prepToUserProcess()
