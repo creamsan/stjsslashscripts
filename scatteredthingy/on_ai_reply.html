@@ -241,7 +241,7 @@ ${origMsg}
 
 
         function hasPunctuation(str) {
-            const punctuationRegex = /[!.,;:'"()?]/
+            const punctuationRegex = /[!.,;:'"()?]/i
             return punctuationRegex.test(str)
         }
 
@@ -264,40 +264,37 @@ ${origMsg}
                 //togetpos string
                 str += d.match + "\n"
 
-                //choose words to be blank - 4 per line
+                //choose words to be blank - 3 per line
                 const dialogueWords = getMatches(/[^\s]+/gi, d.match)
+                let toChooseIdx = dialogueWords.map((e, i) => i)
                 if (dialogueWords.length >= 5) {
-                    let idxDone = []
-                    for (let i = 0; i < 4; i++) {
-                        let idxRand = Math.floor(Math.random() * dialogueWords.length)
-                        let dWord = dialogueWords[idxRand]
-                        while (idxDone.includes(idxRand) || dWord.original.length <= 2 || hasPunctuation(dWord.original)) {
-                            idxRand = Math.floor(Math.random() * dialogueWords.length)
+                    for (let i = 0; i < 3; i++) {
+                        let idxRand = -1
+                        let dWord = ""
+                        while (dWord === "" || dWord.original.length <= 2 || hasPunctuation(dWord.original)) {
+                            if (toChooseIdx.length === 0) {
+                                return
+                            }
+                            idxRand = toChooseIdx[Math.floor(Math.random() * toChooseIdx.length)]
+                            toChooseIdx = toChooseIdx.filter(i => i !== idxRand)
                             dWord = dialogueWords[idxRand]
                         }
-                        idxDone.push(idxRand)
                         words.push(dialogueWords[idxRand].original)
-                        dialogueWords[idxRand].match = "_____"
+                        dialogueWords[idxRand].match = "???"
                     }
                 }
 
                 //toConstruct
-                let toAppend = `"`
                 dialogueWords.forEach(d => {
-                    if (d.match === "_____") {
-
-                    }
-                    else {
-                        toAppend += d.match
-                    }
-
-                    toAppend += " "
+                    if (d.match !== "???") toConstruct.push(d.match + " ")
+                    else toConstruct.push(d.match)
                 });
             });
 
 
             //scatter words
             let blankLongest = 0
+            let blankHeight = 0
             words.forEach(w => {
                 const word = add([
                     anchor("center"),
@@ -307,9 +304,13 @@ ${origMsg}
                         font: "monospace"
                     }),
                     area(),
-                    "word"
+                    "word",
+                    { lastInteract: null }
                 ])
-                if (word.width > blankLongest) blankLongest = word.width
+                if (word.width > blankLongest) {
+                    blankLongest = word.width
+                    blankHeight = word.height
+                }
             });
 
 
@@ -345,13 +346,96 @@ ${origMsg}
                 color(185, 240, 186),
                 text(str, {
                     size: TEXT_SIZE,
-                    width: CANVAS_WIDTH - 25,
+                    width: CANVAS_WIDTH - 30,
                     font: "monospace"
-                })
+                }),
+                opacity(0)
             ])
             const startV = vec2(12, (CANVAS_HEIGHT / 2) - (toGetPos.height / 2))
+            destroy(toGetPos)
 
 
+            //dialogues
+            let currentV = startV.clone()
+            toConstruct.forEach(elem => {
+                if (elem === "???") {
+                    const e = add([
+                        anchor("center"),
+                        pos(currentV.x + blankLongest * .5, currentV.y + blankHeight * .5),
+                        color(185, 240, 186),
+                        text(elem, {
+                            size: TEXT_SIZE,
+                            width: blankLongest + 5,
+                            font: "monospace",
+                            align: "center"
+                        }),
+                        color(235, 185, 234),
+                        area(),
+                        "blank",
+                        { occupied: false }
+                    ])
+                    currentV.x += e.width + 8
+                    if (currentV.x > CANVAS_WIDTH) {
+                        currentV.x = startV.x
+                        currentV.y = currentV.y + TEXT_SIZE + 8
+                        e.pos = vec2(currentV.x + blankLongest * .5, currentV.y + blankHeight * .5)
+                        currentV.x += e.width
+                    }
+                }
+                else {
+                    const e = add([
+                        pos(currentV),
+                        color(185, 240, 186),
+                        text(elem, {
+                            size: TEXT_SIZE,
+                            font: "monospace",
+                        })
+                    ])
+                    currentV.x += e.width
+                    if (currentV.x > CANVAS_WIDTH) {
+                        currentV.x = startV.x
+                        currentV.y = currentV.y + TEXT_SIZE + 8
+                        e.pos = vec2(currentV.x, currentV.y)
+                        currentV.x += e.width
+                    }
+                }
+            });
+
+
+            //filling the blanks
+            onMouseRelease("left", function () {
+                const blanks = get("blank")
+                blanks.forEach(b => {
+                    b.opacity = 1
+                });
+
+                const words = get("word")
+                words.forEach(w => {
+                    if (w.lastInteract == null) {
+                        return
+                    }
+                    w.pos = vec2(w.lastInteract.pos)
+                    w.lastInteract.opacity = 0
+                });
+            })
+
+            onCollide("blank", "word", function (blank, word) {
+                if (blank.occupied) {
+                    return
+                }
+                if (word.lastInteract != null && word.lastInteract.id == blank.id) {
+                    return
+                }
+                word.lastInteract = blank
+                blank.occupied = true
+            })
+
+            onCollideEnd("blank", "word", function (blank, word) {
+                if (word.lastInteract != null && word.lastInteract.id === blank.id) {
+                    word.lastInteract = null
+                    blank.occupied = false
+                }
+            })
 
         }
 
@@ -379,9 +463,8 @@ ${origMsg}
         }
 
 
-        const sampleInput = `"For the final episode of WTF, Marc travels" to Washington, DC for another conversation with the most significant guest in the show's history. "Former President Barack Obama welcomes Marc into his office to speak about the legacy of the podcast," the need for human connection, and the reason."`
+        const sampleInput = `"For the final episode of WTF, Marc travels to Washington, DC for another" conversation with the most significant guest in the show's history. "Former President Barack Obama welcomes Marc into his office to speak about the legacy of the podcast," the need for human connection, and the reason.`
         const sampleWords = `dog
-ministration
 pussy
 cock`
 
