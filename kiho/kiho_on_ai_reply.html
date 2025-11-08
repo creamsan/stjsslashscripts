@@ -451,12 +451,7 @@
                         if (moving && entitiesMove && steps > 0) {
                             //get input from ai
                             let step = vec2(v.x * ENTITY_SPEED * dt(), v.y * ENTITY_SPEED * dt())
-                            if (this.pos.x <= 5 || this.pos.x >= CANVAS_WIDTH - 5 || this.pos.y <= 5 || this.pos.y >= CANVAS_HEIGHT - 5) {
-                                this.move(step.x * -1, step.y * -1)
-                            }
-                            else {
-                                this.move(step)
-                            }
+                            this.move(step)
                             steps -= 1
                         }
                         else if (moving && entitiesMove && steps <= 0) {

@@ -156,7 +156,7 @@
 
 
             //load ai reply
-            const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
             let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
             const origInput = input
 
@@ -262,10 +262,10 @@
                 toCut = true
                 saveData()
             })
-            if(swiped) {
-                const swipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]["swipes"]
+            if (swiped) {
+                const swipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]["swipes"]
                 const swipeGen = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
-                if(swipeGen === "...") {
+                if (swipeGen === "...") {
                     saveData()
                     return
                 }

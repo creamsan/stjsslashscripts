@@ -1,0 +1,439 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://unpkg.com/kaplay@4000.0.0-alpha.22/dist/kaplay.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            margin: 0;
+            width: 100%;
+            height: fit-content;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: aqua;
+        }
+
+        canvas {
+            margin: 0 auto;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(184, 48, 48);
+        }
+
+        .stylized-button {
+            color: white;
+            padding: 3px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .stylized-button:hover {
+            transform: scale(1.05);
+        }
+
+        .stylized-button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not generate the expected output. Please swipe or regenerate. If this is the intro, you
+            should ignore this.
+        </div>
+        <button class="stylized-button" id="ignore_btn">Ignore</button>
+    </div>
+    <div id="main_cont"></div>
+
+    <script>
+        const main_cont = document.getElementById("main_cont")
+        const CANVAS_WIDTH = 650
+        const CANVAS_HEIGHT = 400
+
+        kaplay({
+            width: CANVAS_WIDTH,
+            height: CANVAS_HEIGHT,
+        })
+        const game = document.querySelector("canvas")
+
+
+        const error = document.getElementById("error")
+        function initError() {
+            const error_msg = document.getElementById("error_msg")
+            const errorIgnoreBtn = document.getElementById("ignore_btn")
+            errorIgnoreBtn.addEventListener("click", function () {
+                main_cont.style.display = "flex"
+                error.style.display = "none"
+            })
+        }
+
+
+        let chatMessages
+        let input
+        async function loadAIReply() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            input = chatMessages.swipes[chatMessages.swipes.length - 1]
+            const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
+            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+        }
+
+
+        let toJB = ""
+        let gameOver
+        let swiped
+        let toCut
+        let userMesEdited
+        let expectingOutputOnId
+        let chatData
+        let chatDataHist
+        let toUserProcess = {}
+        function loadChatData() {
+            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
+            chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id - 1]
+            if (chatData == null) {
+                chatData = {}
+                chatDataHist = {}
+                gameOver = false
+                swiped = false
+                toCut = true
+                expectingOutputOnId = -1
+            }
+            else {
+                gameOver = chatData.gameOver
+                swiped = chatData.swiped
+                toCut = chatData.toCut
+                expectingOutputOnId = chatData.expectingOutputOnId
+            }
+        }
+
+
+        async function saveData() {
+            chatData.gameOver = gameOver
+            chatData.swiped = swiped
+            chatData.toCut = toCut
+            chatData.userMesEdited = false
+            chatData.toUserProcess = toUserProcess
+            chatDataHist[chatMessages.message_id] = chatData
+            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
+        }
+
+
+        function verifyInputs() {
+            if (gameOver) {
+                main_cont.parentNode.removeChild(main_cont)
+                return false
+            }
+
+            const mesId = chatMessages.message_id
+
+            if (input == "") {
+                main_cont.style.display = "none"
+                error.style.display = "flex"
+                return false
+            }
+
+            if (mesId === 0) {
+                main_cont.style.display = "none"
+                error.style.display = "none"
+            }
+
+            return true
+        }
+
+
+        async function handleSwipe() {
+            eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
+                //change some data and save everything before swipe
+                swiped = true
+                await saveData()
+            })
+            if (swiped) {
+                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
+                const swipeGen = newGenSwipes[newGenSwipes.length - 1]
+                if (swipeGen === "...") {
+                    await saveData()
+                    return true
+                }
+                input = swipeGen
+                swiped = false
+            }
+            return false
+        }
+
+
+        function modifyAIMes(msg, origMsg) {
+            // note: hacky - fix later 
+            // send the modified AI message
+            // send the orig AI message as hidden
+            // hide the modified AI message
+            // cut the unmodified ai message
+            if (aiMesChanged === false) {
+                aiMesChanged = true
+                triggerSlash(`/sendas name="{{char}}" ${msg} |
+                    /sendas name="{{char}}" <details><summary>Original</summary>
+${origMsg}
+</details> |
+                    /cut {{lastMessageId}} |
+                    /hide {{lastMessageId}}
+                `)
+            }
+        }
+
+
+        function getMatches(regex, str) {
+            const matches = [];
+            const matchR = str.matchAll(regex)
+            for (const match of matchR) {
+                matches.push({
+                    match: match[0],
+                    index: match.index,
+                    original: match[0]
+                });
+            }
+            return matches;
+        }
+
+
+        function getWords(regex, str) {
+            const matches = [];
+            const matchR = str.matchAll(regex)
+            for (const match of matchR) {
+                matches.push(match[0]);
+            }
+            return matches;
+        }
+
+
+        function hasPunctuation(str) {
+            const punctuationRegex = /[!.,;:'"()?]/
+            return punctuationRegex.test(str)
+        }
+
+
+        const TEXT_SIZE = 16
+        //3 words per line
+        function initUI(dialogues, words) {
+            //bg
+            loadSprite("bg", "https://files.catbox.moe/zud2hn.jpg")
+            add([
+                sprite("bg"),
+                z(-1),
+                pos(0, -150)
+            ])
+
+
+            let str = ""
+            let toConstruct = []
+            dialogues.forEach(d => {
+                //togetpos string
+                str += d.match + "\n"
+
+                //choose words to be blank - 4 per line
+                const dialogueWords = getMatches(/[^\s]+/gi, d.match)
+                if (dialogueWords.length >= 5) {
+                    let idxDone = []
+                    for (let i = 0; i < 4; i++) {
+                        let idxRand = Math.floor(Math.random() * dialogueWords.length)
+                        let dWord = dialogueWords[idxRand]
+                        while (idxDone.includes(idxRand) || dWord.original.length <= 2 || hasPunctuation(dWord.original)) {
+                            idxRand = Math.floor(Math.random() * dialogueWords.length)
+                            dWord = dialogueWords[idxRand]
+                        }
+                        idxDone.push(idxRand)
+                        words.push(dialogueWords[idxRand].original)
+                        dialogueWords[idxRand].match = "_____"
+                    }
+                }
+
+                //toConstruct
+                let toAppend = `"`
+                dialogueWords.forEach(d => {
+                    if (d.match === "_____") {
+
+                    }
+                    else {
+                        toAppend += d.match
+                    }
+
+                    toAppend += " "
+                });
+            });
+
+
+            //scatter words
+            let blankLongest = 0
+            words.forEach(w => {
+                const word = add([
+                    anchor("center"),
+                    pos(randomXY()),
+                    text(w, {
+                        size: TEXT_SIZE,
+                        font: "monospace"
+                    }),
+                    area(),
+                    "word"
+                ])
+                if (word.width > blankLongest) blankLongest = word.width
+            });
+
+
+            //word dragging
+            let startDragPos = vec2(0)
+            let newDragPos = vec2(0)
+            let held = []
+            onClick("word", function (word) {
+                if (held.length > 0) {
+                    return
+                }
+                let toDrag = word
+                startDragPos = mousePos()
+                held.push(word.id)
+                const drag = onMouseMove(function () {
+                    newDragPos = mousePos().sub(startDragPos)
+                    startDragPos = mousePos()
+                    toDrag.pos = toDrag.pos.add(newDragPos)
+                })
+                onMouseRelease("left", () => {
+                    if (drag != undefined) {
+                        drag.cancel()
+                    }
+                    held = []
+                })
+            })
+
+
+            //approximate height of textbox
+            const toGetPos = add([
+                anchor("center"),
+                pos(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2),
+                color(185, 240, 186),
+                text(str, {
+                    size: TEXT_SIZE,
+                    width: CANVAS_WIDTH - 25,
+                    font: "monospace"
+                })
+            ])
+            const startV = vec2(12, (CANVAS_HEIGHT / 2) - (toGetPos.height / 2))
+
+
+
+        }
+
+
+        function randomXY() {
+            const x = randi(15, CANVAS_WIDTH - 15)
+            let y
+            if (x > 50 && x < CANVAS_WIDTH - 50) {
+                let up = randi(0, 101) < 50
+                y = up ? randi(15, 50) : randi(CANVAS_HEIGHT - 50, CANVAS_HEIGHT - 15)
+            }
+            else {
+                y = randi(15, CANVAS_HEIGHT - 15)
+            }
+
+            return vec2(x, y)
+        }
+
+
+        function replaceAtIndex(originalString, index, replacement) {
+            if (index < 0 || index >= originalString.length) {
+                throw new Error("Error at replacing index.");
+            }
+            return originalString.substring(0, index) + replacement + originalString.substring(index + replacement.length);
+        }
+
+
+        const sampleInput = `"For the final episode of WTF, Marc travels" to Washington, DC for another conversation with the most significant guest in the show's history. "Former President Barack Obama welcomes Marc into his office to speak about the legacy of the podcast," the need for human connection, and the reason."`
+        const sampleWords = `dog
+ministration
+pussy
+cock`
+
+
+        //main
+        document.addEventListener("DOMContentLoaded", async function () {
+            // initError()
+            // await loadAIReply()
+            // loadChatData()
+
+            //intro handler - for multi intro cards
+            // if (chatMessages.message_id === 0) {
+
+            // }
+
+            //regexes here
+            // if (verifyInputs() === false) {
+            //     await saveData()
+            //     return
+            // }
+
+            const regexDialogues = /"[^"]+?"/gi
+            const regexWords = /[\w]+/gi
+            const dialogues = getMatches(regexDialogues, sampleInput)
+            let words = getWords(regexWords, sampleWords)
+            initUI(dialogues, words)
+
+            // if (await handleSwipe()) return
+
+
+            //main func start here
+
+
+            // prepToUserProcess()
+            // await updateJB()
+            // saveData()
+        })
+
+
+        function prepToUserProcess() {
+            //process stuff to be updated on user side
+
+        }
+
+
+        async function updateJB() {
+            await insertOrAssignVariables({ jbout: toJB })
+            toJB = ""
+        }
+
+    </script>
+</body>
+
+</html>
+```
