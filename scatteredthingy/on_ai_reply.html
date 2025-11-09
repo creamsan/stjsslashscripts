@@ -304,8 +304,7 @@ ${origMsg}
                         font: "monospace"
                     }),
                     area(),
-                    "word",
-                    { lastInteract: null }
+                    "word"
                 ])
                 if (word.width > blankLongest) {
                     blankLongest = word.width
@@ -372,7 +371,7 @@ ${origMsg}
                         color(235, 185, 234),
                         area(),
                         "blank",
-                        { occupied: false }
+                        { lastInteract: null }
                     ])
                     currentV.x += e.width + 8
                     if (currentV.x > CANVAS_WIDTH) {
@@ -407,36 +406,38 @@ ${origMsg}
                 const blanks = get("blank")
                 blanks.forEach(b => {
                     b.opacity = 1
-                });
-
-                const words = get("word")
-                words.forEach(w => {
-                    if (w.lastInteract == null) {
-                        return
+                    if(b.lastInteract != null) {
+                        b.opacity = 0
+                        b.lastInteract.pos = vec2(b.pos)
                     }
-                    w.pos = vec2(w.lastInteract.pos)
-                    w.lastInteract.opacity = 0
                 });
             })
 
             onCollide("blank", "word", function (blank, word) {
-                if (blank.occupied) {
+                if (blank.lastInteract != null) {
                     return
                 }
-                if (word.lastInteract != null && word.lastInteract.id == blank.id) {
-                    return
-                }
-                word.lastInteract = blank
-                blank.occupied = true
+                detachAll(word)
+                blank.lastInteract = word
             })
 
             onCollideEnd("blank", "word", function (blank, word) {
-                if (word.lastInteract != null && word.lastInteract.id === blank.id) {
+                if(blank.lastInteract != null && blank.lastInteract.id == word.id) {
                     word.lastInteract = null
-                    blank.occupied = false
+                    blank.lastInteract = null
                 }
             })
 
+        }
+
+
+        function detachAll(word) {
+            const blanks = get("blank")
+            blanks.forEach(b => {
+                if(b.lastInteract != null && b.lastInteract.id == word.id) {
+                    b.lastInteract = null
+                }
+            });
         }
 
 
