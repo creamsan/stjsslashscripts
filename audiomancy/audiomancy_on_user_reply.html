@@ -64,18 +64,15 @@
         }
 
 
-        // let gameOver
         let swiped
         let aiMesChanged
         let userMesEdited
-        // let expectingOutputOnId
         let chatData
         let chatDataHist
         let toUserProcess = {}
         function loadChatData() {
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
             chatData = chatDataHist[chatMessages.message_id-1]
-            // gameOver = chatData.gameOver
             userMesEdited = chatData.userMesEdited
             toUserProcess = chatData.toUserProcess
         }
@@ -83,10 +80,8 @@
 
         const MAX_CHATDATA_HISTORY = 20
         async function saveData() {
-            // chatData.gameOver = gameOver
             chatData.swiped = false
             chatData.aiMesChanged = false
-            // chatData.expectingOutputOnId = toUserProcess.expectingOutputOnId === "next" ? Number.parseInt(chatMessages.message_id) + 1 : -1
             chatData.userMesEdited = userMesEdited
             chatDataHist[chatMessages.message_id] = chatData
             const keys = Object.keys(chatDataHist)

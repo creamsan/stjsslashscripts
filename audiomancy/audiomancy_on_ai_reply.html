@@ -91,13 +91,19 @@
     <script>
         const EXTRA_WORDS = [
             "pussy",
+            "pussies",
             "bitch",
+            "bitches",
             "fuck",
             "fucks",
             "nigga",
+            "niggas",
             "cock",
+            "cocks",
             "fag",
+            "fags",
             "retard",
+            "retards"
         ]
 
         const main_cont = document.getElementById("main_cont")
@@ -128,17 +134,16 @@
         async function loadAIReply() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
             input = chatMessages.swipes[chatMessages.swipes.length - 1]
-            // const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
-            // input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+
+            //filter out cot
+            const regexCot = /[\S\s]+<\/think(ing)?>\s+/i
+            input = input.replace(regexCot, "")
         }
 
 
-        // let toJB = ""
-        // let gameOver
         let swiped
         let aiMesChanged
         let userMesEdited
-        // let expectingOutputOnId
         let chatData
         let chatDataHist
         let toUserProcess = {}
@@ -148,22 +153,17 @@
             if (chatData == null) {
                 chatData = {}
                 chatDataHist = {}
-                // gameOver = false
                 swiped = false
                 aiMesChanged = false
-                // expectingOutputOnId = -1
             }
             else {
-                // gameOver = chatData.gameOver
                 swiped = chatData.swiped
                 aiMesChanged = chatData.aiMesChanged
-                // expectingOutputOnId = chatData.expectingOutputOnId
             }
         }
 
 
         async function saveData() {
-            // chatData.gameOver = gameOver
             chatData.swiped = swiped
             chatData.aiMesChanged = aiMesChanged
             chatData.userMesEdited = false
@@ -177,6 +177,12 @@
             if (input == "") {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
+                return false
+            }
+
+            if(aiMesChanged) {
+                main_cont.style.display = "none"
+                game.style.display = "none"
                 return false
             }
 
@@ -213,10 +219,10 @@
             // cut the unmodified ai message
             if (aiMesChanged === false) {
                 aiMesChanged = true
-                triggerSlash(`/sendas name="{{char}}" ${msg} |
-                    /sendas name="{{char}}" <details><summary>Original</summary>
+                triggerSlash(`/sendas name="{{char}}" <details><summary>Original</summary>
 ${origMsg}
 </details> |
+                    /sendas name="{{char}}" ${msg} |
                     /cut {{lastMessageId}} |
                     /hide {{lastMessageId}}
                 `)
@@ -326,12 +332,12 @@ ${origMsg}
                 color(185, 240, 186),
                 text(str, {
                     size: TEXT_SIZE,
-                    width: CANVAS_WIDTH - 30,
+                    width: CANVAS_WIDTH - 20,
                     font: "monospace"
                 }),
                 opacity(0)
             ])
-            const startV = vec2(12, (CANVAS_HEIGHT / 2) - (toGetPos.height / 2) - 30)
+            const startV = vec2(10, (CANVAS_HEIGHT / 2) - (toGetPos.height / 2) - 20)
             destroy(toGetPos)
 
 
@@ -508,18 +514,9 @@ ${origMsg}
             await loadAIReply()
             loadChatData()
 
-            //intro handler - for multi intro cards
-            if (chatMessages.message_id === 0) {
-                if(chatMessages.swipe_id === 0) {
-                    //audiomancer intro
-
-
-                }
-                else if(chatMessages.swipe_id === 1) {
-                    //deaf lip reading intro
-
-
-                }
+            if(verifyInputs() === false) {
+                await saveData()
+                return
             }
 
             if (await handleSwipe()) return
@@ -556,23 +553,10 @@ ${origMsg}
                 saveData()
             })
 
-            // prepToUserProcess()
-            // await updateJB()
             saveData()
 
             document.querySelector("body").style.height = "fit-content"
         })
-
-
-        // function prepToUserProcess() {
-            //process stuff to be updated on user side
-        // }
-
-
-        // async function updateJB() {
-        //     await insertOrAssignVariables({ jbout: toJB })
-        //     toJB = ""
-        // }
 
     </script>
 </body>
