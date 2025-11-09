@@ -66,7 +66,7 @@
 
         let gameOver
         let swiped
-        let toCut
+        let aiMesChanged
         let userMesEdited
         let expectingOutputOnId
         let chatData
@@ -85,7 +85,7 @@
         async function saveData() {
             chatData.gameOver = gameOver
             chatData.swiped = false
-            chatData.toCut = true
+            chatData.aiMesChanged = false
             chatData.expectingOutputOnId = toUserProcess.expectingOutputOnId === "next" ? Number.parseInt(chatMessages.message_id) + 1 : -1
             chatData.userMesEdited = userMesEdited
             chatDataHist[chatMessages.message_id] = chatData

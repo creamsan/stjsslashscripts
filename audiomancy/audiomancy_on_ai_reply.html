@@ -26,7 +26,7 @@
             align-items: center;
             gap: 20px;
             border-radius: 7px;
-            background-color: aqua;
+            margin-bottom: 5px;
         }
 
         canvas {
@@ -65,6 +65,11 @@
         .stylized-button:active {
             transform: scale(0.95);
         }
+
+        #doneBtn {
+            background-color: darkcyan;
+            padding: 5px;
+        }
     </style>
 </head>
 
@@ -79,10 +84,24 @@
         </div>
         <button class="stylized-button" id="ignore_btn">Ignore</button>
     </div>
-    <div id="main_cont"></div>
+    <div id="main_cont">
+        <button class="stylized-button" id="doneBtn">Done</button>
+    </div>
 
     <script>
+        const EXTRA_WORDS = [
+            "pussy",
+            "bitch",
+            "fuck",
+            "fucks",
+            "nigga",
+            "cock",
+            "fag",
+            "retard",
+        ]
+
         const main_cont = document.getElementById("main_cont")
+        const doneBtn = document.getElementById("doneBtn")
         const CANVAS_WIDTH = 650
         const CANVAS_HEIGHT = 400
 
@@ -109,17 +128,17 @@
         async function loadAIReply() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
             input = chatMessages.swipes[chatMessages.swipes.length - 1]
-            const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
-            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+            // const regexInput = /<result>([\S\s](?!<result>))+?<\/result>/i
+            // input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
         }
 
 
-        let toJB = ""
-        let gameOver
+        // let toJB = ""
+        // let gameOver
         let swiped
-        let toCut
+        let aiMesChanged
         let userMesEdited
-        let expectingOutputOnId
+        // let expectingOutputOnId
         let chatData
         let chatDataHist
         let toUserProcess = {}
@@ -129,24 +148,24 @@
             if (chatData == null) {
                 chatData = {}
                 chatDataHist = {}
-                gameOver = false
+                // gameOver = false
                 swiped = false
-                toCut = true
-                expectingOutputOnId = -1
+                aiMesChanged = false
+                // expectingOutputOnId = -1
             }
             else {
-                gameOver = chatData.gameOver
+                // gameOver = chatData.gameOver
                 swiped = chatData.swiped
-                toCut = chatData.toCut
-                expectingOutputOnId = chatData.expectingOutputOnId
+                aiMesChanged = chatData.aiMesChanged
+                // expectingOutputOnId = chatData.expectingOutputOnId
             }
         }
 
 
         async function saveData() {
-            chatData.gameOver = gameOver
+            // chatData.gameOver = gameOver
             chatData.swiped = swiped
-            chatData.toCut = toCut
+            chatData.aiMesChanged = aiMesChanged
             chatData.userMesEdited = false
             chatData.toUserProcess = toUserProcess
             chatDataHist[chatMessages.message_id] = chatData
@@ -155,22 +174,10 @@
 
 
         function verifyInputs() {
-            if (gameOver) {
-                main_cont.parentNode.removeChild(main_cont)
-                return false
-            }
-
-            const mesId = chatMessages.message_id
-
             if (input == "") {
                 main_cont.style.display = "none"
                 error.style.display = "flex"
                 return false
-            }
-
-            if (mesId === 0) {
-                main_cont.style.display = "none"
-                error.style.display = "none"
             }
 
             return true
@@ -181,6 +188,7 @@
             eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
                 //change some data and save everything before swipe
                 swiped = true
+                aiMesChanged = false
                 await saveData()
             })
             if (swiped) {
@@ -247,7 +255,7 @@ ${origMsg}
 
 
         const TEXT_SIZE = 16
-        //3 words per line
+        let assoc = []
         function initUI(dialogues, words) {
             //bg
             loadSprite("bg", "https://files.catbox.moe/zud2hn.jpg")
@@ -260,7 +268,7 @@ ${origMsg}
 
             let str = ""
             let toConstruct = []
-            dialogues.forEach(d => {
+            dialogues.forEach((d, di) => {
                 //togetpos string
                 str += d.match + "\n"
 
@@ -281,6 +289,12 @@ ${origMsg}
                         }
                         words.push(dialogueWords[idxRand].original)
                         dialogueWords[idxRand].match = "???"
+
+                        assoc.push({
+                            dialogueIdx: di,
+                            idx: dialogueWords[idxRand].index,
+                            orig: dWord.original
+                        })
                     }
                 }
 
@@ -289,7 +303,36 @@ ${origMsg}
                     if (d.match !== "???") toConstruct.push(d.match + " ")
                     else toConstruct.push(d.match)
                 });
+
             });
+            //sort by index
+            assoc = assoc.sort((a, b) => a.idx - b.idx)
+                .sort((a, b) => a.dialogueIdx - b.dialogueIdx)
+
+
+            //associate blanks
+            for (let i = 0, j = 0; i < toConstruct.length; i++) {
+                if (toConstruct[i] === "???") {
+                    assoc[j].toConstructIdx = i
+                    j++
+                }
+            }
+
+
+            //approximate height of textbox
+            const toGetPos = add([
+                anchor("center"),
+                pos(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2),
+                color(185, 240, 186),
+                text(str, {
+                    size: TEXT_SIZE,
+                    width: CANVAS_WIDTH - 30,
+                    font: "monospace"
+                }),
+                opacity(0)
+            ])
+            const startV = vec2(12, (CANVAS_HEIGHT / 2) - (toGetPos.height / 2) - 30)
+            destroy(toGetPos)
 
 
             //scatter words
@@ -338,25 +381,9 @@ ${origMsg}
             })
 
 
-            //approximate height of textbox
-            const toGetPos = add([
-                anchor("center"),
-                pos(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2),
-                color(185, 240, 186),
-                text(str, {
-                    size: TEXT_SIZE,
-                    width: CANVAS_WIDTH - 30,
-                    font: "monospace"
-                }),
-                opacity(0)
-            ])
-            const startV = vec2(12, (CANVAS_HEIGHT / 2) - (toGetPos.height / 2))
-            destroy(toGetPos)
-
-
             //dialogues
             let currentV = startV.clone()
-            toConstruct.forEach(elem => {
+            toConstruct.forEach((elem, i) => {
                 if (elem === "???") {
                     const e = add([
                         anchor("center"),
@@ -368,7 +395,7 @@ ${origMsg}
                             font: "monospace",
                             align: "center"
                         }),
-                        color(235, 185, 234),
+                        color(240, 86, 86),
                         area(),
                         "blank",
                         { lastInteract: null }
@@ -380,6 +407,8 @@ ${origMsg}
                         e.pos = vec2(currentV.x + blankLongest * .5, currentV.y + blankHeight * .5)
                         currentV.x += e.width
                     }
+
+                    assoc.filter(a => a.toConstructIdx === i)[0].blankId = e.id
                 }
                 else {
                     const e = add([
@@ -406,7 +435,7 @@ ${origMsg}
                 const blanks = get("blank")
                 blanks.forEach(b => {
                     b.opacity = 1
-                    if(b.lastInteract != null) {
+                    if (b.lastInteract != null) {
                         b.opacity = 0
                         b.lastInteract.pos = vec2(b.pos)
                     }
@@ -414,7 +443,7 @@ ${origMsg}
             })
 
             onCollide("blank", "word", function (blank, word) {
-                if (blank.lastInteract != null) {
+                if (blank.lastInteract != null && blank.lastInteract.id != word.id) {
                     return
                 }
                 detachAll(word)
@@ -422,7 +451,7 @@ ${origMsg}
             })
 
             onCollideEnd("blank", "word", function (blank, word) {
-                if(blank.lastInteract != null && blank.lastInteract.id == word.id) {
+                if (blank.lastInteract != null && blank.lastInteract.id == word.id) {
                     word.lastInteract = null
                     blank.lastInteract = null
                 }
@@ -434,7 +463,7 @@ ${origMsg}
         function detachAll(word) {
             const blanks = get("blank")
             blanks.forEach(b => {
-                if(b.lastInteract != null && b.lastInteract.id == word.id) {
+                if (b.lastInteract != null && b.lastInteract.id == word.id) {
                     b.lastInteract = null
                 }
             });
@@ -456,65 +485,94 @@ ${origMsg}
         }
 
 
-        function replaceAtIndex(originalString, index, replacement) {
-            if (index < 0 || index >= originalString.length) {
-                throw new Error("Error at replacing index.");
+        function replaceAtIndex(str, regex, replacement, startIndex) {
+            const globalRegex = new RegExp(regex, 'g');
+            let match;
+            while ((match = globalRegex.exec(str)) !== null) {
+                if (match.index >= startIndex) {
+                    return str.slice(0, match.index) + replacement + str.slice(globalRegex.lastIndex);
+                }
             }
-            return originalString.substring(0, index) + replacement + originalString.substring(index + replacement.length);
+            return str;
         }
 
 
-        const sampleInput = `"For the final episode of WTF, Marc travels to Washington, DC for another" conversation with the most significant guest in the show's history. "Former President Barack Obama welcomes Marc into his office to speak about the legacy of the podcast," the need for human connection, and the reason.`
-        const sampleWords = `dog
-pussy
-cock`
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
 
 
         //main
         document.addEventListener("DOMContentLoaded", async function () {
-            // initError()
-            // await loadAIReply()
-            // loadChatData()
+            initError()
+            await loadAIReply()
+            loadChatData()
 
             //intro handler - for multi intro cards
-            // if (chatMessages.message_id === 0) {
+            if (chatMessages.message_id === 0) {
+                if(chatMessages.swipe_id === 0) {
+                    //audiomancer intro
 
-            // }
 
-            //regexes here
-            // if (verifyInputs() === false) {
-            //     await saveData()
-            //     return
-            // }
+                }
+                else if(chatMessages.swipe_id === 1) {
+                    //deaf lip reading intro
 
-            const regexDialogues = /"[^"]+?"/gi
-            const regexWords = /[\w]+/gi
-            const dialogues = getMatches(regexDialogues, sampleInput)
-            let words = getWords(regexWords, sampleWords)
-            initUI(dialogues, words)
 
-            // if (await handleSwipe()) return
+                }
+            }
 
+            if (await handleSwipe()) return
 
             //main func start here
+            const regexDialogues = /"[^"]+?"/gi
+            let dialogues = getMatches(regexDialogues, input)
 
+            const regexAIWords = /(?<=<words>)([\S\s](?!<words>))+?(?=<\/words>)/i
+            const wordsFromAI = regexAIWords.test(input) ? input.match(regexAIWords)[0] : ""
+            const regexWords = /[\w]+/gi
+            let words = getWords(regexWords, wordsFromAI)
+            words = [...words, ...EXTRA_WORDS]
+
+            initUI(dialogues, words)
+
+            doneBtn.addEventListener("click", function () {
+                const blanks = get("blank")
+                blanks.forEach(b => {
+                    if (b.lastInteract == null) {
+                        return
+                    }
+                    let assocEntry = assoc.filter(a => a.blankId === b.id)[0]
+                    dialogues[assocEntry.dialogueIdx].match = replaceAtIndex(dialogues[assocEntry.dialogueIdx].match, escapeRegExp(assocEntry.orig), b.lastInteract.text, assocEntry.idx)
+
+                });
+
+                //replace update aimes
+                let fin = input
+                dialogues.forEach(d => {
+                    fin = replaceAtIndex(input, escapeRegExp(d.original), d.match, d.index)
+                });
+                modifyAIMes(fin, input)
+                saveData()
+            })
 
             // prepToUserProcess()
             // await updateJB()
-            // saveData()
+            saveData()
+
+            document.querySelector("body").style.height = "fit-content"
         })
 
 
-        function prepToUserProcess() {
+        // function prepToUserProcess() {
             //process stuff to be updated on user side
+        // }
 
-        }
 
-
-        async function updateJB() {
-            await insertOrAssignVariables({ jbout: toJB })
-            toJB = ""
-        }
+        // async function updateJB() {
+        //     await insertOrAssignVariables({ jbout: toJB })
+        //     toJB = ""
+        // }
 
     </script>
 </body>

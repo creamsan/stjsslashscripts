@@ -110,7 +110,7 @@
         let toJB = ""
         let gameOver
         let swiped
-        let toCut
+        let aiMesChanged
         let userMesEdited
         let expectingOutputOnId
         let chatData
@@ -124,13 +124,13 @@
                 chatDataHist = {}
                 gameOver = false
                 swiped = false
-                toCut = true
+                aiMesChanged = false
                 expectingOutputOnId = -1
             }
             else {
                 gameOver = chatData.gameOver
                 swiped = chatData.swiped
-                toCut = chatData.toCut
+                aiMesChanged = chatData.aiMesChanged
                 expectingOutputOnId = chatData.expectingOutputOnId
             }
         }
@@ -139,7 +139,7 @@
         async function saveData() {
             chatData.gameOver = gameOver
             chatData.swiped = swiped
-            chatData.toCut = toCut
+            chatData.aiMesChanged = aiMesChanged
             chatData.userMesEdited = false
             chatData.toUserProcess = toUserProcess
             chatDataHist[chatMessages.message_id] = chatData
