@@ -139,6 +139,7 @@
         }
 
 
+        let toJB = ""
         let swiped
         let aiMesChanged
         let userMesEdited
@@ -542,8 +543,9 @@ ${origMsg}
 
             initUI(dialogues, words)
 
-            doneBtn.addEventListener("click", function () {
+            doneBtn.addEventListener("click", async function () {
                 const blanks = get("blank")
+                let modCount = 0
                 blanks.forEach(b => {
                     if (b.lastInteract == null) {
                         return
@@ -551,6 +553,9 @@ ${origMsg}
                     let assocEntry = assoc.filter(a => a.blankId === b.id)[0]
                     dialogues[assocEntry.dialogueIdx].match = replaceAtIndex(dialogues[assocEntry.dialogueIdx].match, escapeRegExp(assocEntry.orig), b.lastInteract.text, assocEntry.idx)
 
+                    if(assocEntry.orig !== b.lastInteract.text) {
+                        modCount += 1
+                    }
                 });
 
                 //replace update aimes
@@ -559,15 +564,33 @@ ${origMsg}
                     fin = replaceAtIndex(input, escapeRegExp(d.original), d.match, d.index)
                 });
                 modifyAIMes(fin, input)
+                updateJB(fin, input, modCount)
                 saveData()
             })
-
-            console.log(dialogues)
 
             saveData()
 
             document.querySelector("body").style.height = "fit-content"
         })
+
+
+        async function updateJB(manipulated, orig, modCount) {
+            if(modCount === 0) {
+                return
+            }
+
+            toJB = `- {{user}} manipulated some dialogues. Here are the changes:
+
+Original:
+${orig}
+
+New:
+${manipulated}
+`
+
+            await insertOrAssignVariables({ jbout: toJB })
+            toJB = ""
+        }
 
     </script>
 </body>
