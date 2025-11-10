@@ -131,7 +131,7 @@
         let input
         async function loadAIReply() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
-            input = chatMessages.swipes[chatMessages.swipes.length - 1]
+            input = chatMessages.swipes[chatMessages.swipe_id]
 
             //filter out cot
             const regexCot = /[\S\s]+<\/think(ing)?>\s+/i
@@ -277,11 +277,11 @@ ${origMsg}
                 //togetpos string
                 str += d.match + "\n"
 
-                //choose words to be blank - 3 per line
+                //choose words to be blank - 1 per line
                 const dialogueWords = getMatches(/[^\s]+/gi, d.match)
                 let toChooseIdx = dialogueWords.map((e, i) => i)
                 if (dialogueWords.length >= 5) {
-                    for (let i = 0; i < 3; i++) {
+                    for (let i = 0; i < 1; i++) {
                         let idxRand = -1
                         let dWord = ""
                         while (dWord === "" || dWord.original.length <= 2 || hasPunctuation(dWord.original)) {
