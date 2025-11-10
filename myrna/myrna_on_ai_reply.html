@@ -90,8 +90,6 @@
 
     <script>
         const EXTRA_WORDS = [
-            "pussy",
-            "pussies",
             "bitch",
             "bitches",
             "fuck",
@@ -180,7 +178,7 @@
                 return false
             }
 
-            if(aiMesChanged) {
+            if (aiMesChanged) {
                 main_cont.style.display = "none"
                 game.style.display = "none"
                 return false
@@ -255,7 +253,7 @@ ${origMsg}
 
 
         function hasPunctuation(str) {
-            const punctuationRegex = /[!.,;:'"()?]/i
+            const punctuationRegex = /[!.,;:'"()?*]/i
             return punctuationRegex.test(str)
         }
 
@@ -311,6 +309,7 @@ ${origMsg}
                 });
 
             });
+
             //sort by index
             assoc = assoc.sort((a, b) => a.idx - b.idx)
                 .sort((a, b) => a.dialogueIdx - b.dialogueIdx)
@@ -508,13 +507,22 @@ ${origMsg}
         }
 
 
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1)); // Random index
+                [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+            }
+            return array;
+        }
+
+
         //main
         document.addEventListener("DOMContentLoaded", async function () {
             initError()
             await loadAIReply()
             loadChatData()
 
-            if(verifyInputs() === false) {
+            if (verifyInputs() === false) {
                 await saveData()
                 return
             }
@@ -529,7 +537,8 @@ ${origMsg}
             const wordsFromAI = regexAIWords.test(input) ? input.match(regexAIWords)[0] : ""
             const regexWords = /[\w]+/gi
             let words = getWords(regexWords, wordsFromAI)
-            words = [...words, ...EXTRA_WORDS]
+            let extraWords = shuffleArray([...EXTRA_WORDS])
+            words = [...words, extraWords[0], extraWords[1], extraWords[2], extraWords[3], extraWords[4]]
 
             initUI(dialogues, words)
 
@@ -552,6 +561,8 @@ ${origMsg}
                 modifyAIMes(fin, input)
                 saveData()
             })
+
+            console.log(dialogues)
 
             saveData()
 
