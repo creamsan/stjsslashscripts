@@ -59,7 +59,7 @@
                 chatData["toCut"] = true
                 chatData["unlockCount"] = unlockCount
                 chatData["userMesEdited"] = userMesEdited
-                chatData["swiped"] = false
+                chatData["currSwipeId"] = 0
                 triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
             }
         })

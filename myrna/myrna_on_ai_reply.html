@@ -70,6 +70,11 @@
             background-color: darkcyan;
             padding: 5px;
         }
+
+        #hideBtn {
+            background-color: rgb(138, 87, 87);
+            padding: 5px;
+        }
     </style>
 </head>
 
@@ -86,6 +91,7 @@
     </div>
     <div id="main_cont">
         <button class="stylized-button" id="doneBtn">Done</button>
+        <button class="stylized-button" id="hideBtn">Hide</button>
     </div>
 
     <script>
@@ -106,6 +112,7 @@
 
         const main_cont = document.getElementById("main_cont")
         const doneBtn = document.getElementById("doneBtn")
+        const hideBtn = document.getElementById("hideBtn")
         const CANVAS_WIDTH = 650
         const CANVAS_HEIGHT = 400
 
@@ -128,60 +135,54 @@
 
 
         let chatMessages
-        let input
         async function loadAIReply() {
             chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
             input = chatMessages.swipes[chatMessages.swipe_id]
 
-            //filter out cot
             const regexCot = /[\S\s]+<\/think(ing)?>\s+/i
             input = input.replace(regexCot, "")
         }
 
 
         let toJB = ""
-        let swiped
+        let currSwipeId
         let aiMesChanged
         let userMesEdited
         let chatData
         let chatDataHist
-        let toUserProcess = {}
         function loadChatData() {
-            chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
-            chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id - 1]
+            chatData = getVariables().chatData == null ? null : JSON.parse[getVariables().chatData]
             if (chatData == null) {
                 chatData = {}
                 chatDataHist = {}
-                swiped = false
+                currSwipeId = 0
                 aiMesChanged = false
             }
             else {
-                swiped = chatData.swiped
+                currSwipeId = chatData.currSwipeId
                 aiMesChanged = chatData.aiMesChanged
             }
         }
 
 
         async function saveData() {
-            chatData.swiped = swiped
+            chatData.currSwipeId = currSwipeId
             chatData.aiMesChanged = aiMesChanged
             chatData.userMesEdited = false
-            chatData.toUserProcess = toUserProcess
-            chatDataHist[chatMessages.message_id] = chatData
-            await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
+            await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
 
         function verifyInputs() {
-            if (input == "") {
-                main_cont.style.display = "none"
-                error.style.display = "flex"
+            if(/<details>\s*<summary>Original<\/summary>/i.test(input)) {
+                main_cont.parentNode.removeChild(main_cont)
+                game.parentNode.removeChild(game)
                 return false
             }
 
-            if (aiMesChanged) {
+            if (input == "") {
                 main_cont.style.display = "none"
-                game.style.display = "none"
+                error.style.display = "flex"
                 return false
             }
 
@@ -190,41 +191,40 @@
 
 
         async function handleSwipe() {
-            eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
-                //change some data and save everything before swipe
-                swiped = true
-                aiMesChanged = false
-                await saveData()
-            })
-            if (swiped) {
-                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-                const swipeGen = newGenSwipes[newGenSwipes.length - 1]
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            if (currSwipeId != newGenSwipes.swipe_id) {
+                const swipeGen = newGenSwipes.swipes[newGenSwipes.swipe_id]
                 if (swipeGen === "...") {
                     await saveData()
                     return true
                 }
                 input = swipeGen
-                swiped = false
+                currSwipeId = newGenSwipes.swipe_id
+                aiMesChanged = false
+                return false
             }
-            return false
         }
 
 
-        function modifyAIMes(msg, origMsg) {
-            // note: hacky - fix later 
-            // send the modified AI message
-            // send the orig AI message as hidden
-            // hide the modified AI message
-            // cut the unmodified ai message
+        //for AI message manipulation
+        async function modifyAIMes(msg, origMsg) {
             if (aiMesChanged === false) {
                 aiMesChanged = true
-                triggerSlash(`/sendas name="{{char}}" <details><summary>Original</summary>
+                await saveData()
+
+                const regexAlreadyModified = /<details>\s*<summary>Original<\/summary>/i
+                if (regexAlreadyModified.test(msg)) {
+                    return
+                }
+
+                const toMsg = `${msg}
+
+<hr id="hide">
+
+<details><summary>Original</summary>
 ${origMsg}
-</details> |
-                    /sendas name="{{char}}" ${msg} |
-                    /cut {{lastMessageId}} |
-                    /hide {{lastMessageId}}
-                `)
+</details>`
+                await setChatMessages([{ message_id: '{{lastMessageId}}', message: toMsg }], { refresh: "affected" })
             }
         }
 
@@ -397,7 +397,7 @@ ${origMsg}
                         color(185, 240, 186),
                         text(elem, {
                             size: TEXT_SIZE,
-                            width: blankLongest + 5,
+                            width: blankLongest + 8,
                             font: "monospace",
                             align: "center"
                         }),
@@ -545,47 +545,54 @@ ${origMsg}
 
             doneBtn.addEventListener("click", async function () {
                 const blanks = get("blank")
-                let modCount = 0
+                let modified = false
+                let fin = input
+                let origToJB = ""
+                let manipulatedToJB = ""
                 blanks.forEach(b => {
                     if (b.lastInteract == null) {
                         return
                     }
                     let assocEntry = assoc.filter(a => a.blankId === b.id)[0]
-                    dialogues[assocEntry.dialogueIdx].match = replaceAtIndex(dialogues[assocEntry.dialogueIdx].match, escapeRegExp(assocEntry.orig), b.lastInteract.text, assocEntry.idx)
+                    dialogues[assocEntry.dialogueIdx].match = replaceAtIndex(dialogues[assocEntry.dialogueIdx].match, escapeRegExp(assocEntry.orig), `<font color="red">${b.lastInteract.text}</font>`, assocEntry.idx)
 
-                    if(assocEntry.orig !== b.lastInteract.text) {
-                        modCount += 1
+                    if (b.lastInteract.text !== assocEntry.orig) {
+                        const d = dialogues[assocEntry.dialogueIdx]
+                        modified = true
+                        fin = replaceAtIndex(fin, escapeRegExp(d.original), d.match, d.index)
+                        console.log(`${d.original} ${d.match}`)
+                        origToJB += d.original + " "
+                        manipulatedToJB += d.match + " "
                     }
                 });
 
-                //replace update aimes
-                let fin = input
-                dialogues.forEach(d => {
-                    fin = replaceAtIndex(input, escapeRegExp(d.original), d.match, d.index)
-                });
-                modifyAIMes(fin, input)
-                updateJB(fin, input, modCount)
+                if (modified) {
+                    modifyAIMes(fin, input)
+                    updateJB(origToJB, manipulatedToJB)    
+                }
+                
                 saveData()
             })
 
-            saveData()
+            hideBtn.addEventListener("click", function() {
+                main_cont.parentNode.removeChild(main_cont)
+                game.parentElement.removeChild(game)
+                document.querySelector("body").style.height = "fit-content"
+            })
 
+            saveData()
             document.querySelector("body").style.height = "fit-content"
         })
 
 
-        async function updateJB(manipulated, orig, modCount) {
-            if(modCount === 0) {
-                return
-            }
-
+        async function updateJB(orig, manipulated) {
             toJB = `- {{user}} manipulated some dialogues. Here are the changes:
 
 Original:
 ${orig}
 
 New:
-${manipulated}
+${manipulated.replace(/<font color="red">|<\/font>/gi, "")}
 `
 
             await insertOrAssignVariables({ jbout: toJB })

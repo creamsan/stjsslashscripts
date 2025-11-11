@@ -114,19 +114,19 @@
             const main_cont = document.getElementById("main_cont")
 
             //load ai reply
-            const newGenSwipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
             let input = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
             const origInput = input
 
 
             //load chatdata
-            let swiped
+            let currSwipeId
             let toCut
             let removeCount
             let toReplace
             let chatData = `{{getvar::chatData}}`
             if (chatData == "") {
-                swiped = false
+                currSwipeId = 0
                 toCut = true
                 removeCount = 3
                 toReplace = []
@@ -138,7 +138,7 @@
             }
             else {
                 chatData = JSON.parse(getVariables()["chatData"])
-                swiped = chatData["swiped"]
+                currSwipeId = chatData["currSwipeId"]
                 toCut = chatData["toCut"]
                 toReplace = chatData["toReplace"]
                 removeCount = chatData["removeCount"]
@@ -147,7 +147,7 @@
 
             function saveData() {
                 chatData = {
-                    "swiped": swiped,
+                    "currSwipeId": currSwipeId,
                     "toCut": toCut,
                     "toReplace": toReplace,
                     "removeCount": removeCount,
@@ -171,27 +171,22 @@
 
 
             //swipe handler
-            eventOnce(tavern_events.MESSAGE_SWIPED, function () {
-                //change some data and save everything before swipe
-                swiped = true
-                toCut = true
-                saveData()
-            })
-            if(swiped) {
-                const swipes = await getChatMessages('{{lastMessageId}}', {include_swipes: true})[0]["swipes"]
+            const swipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            if (currSwipeId !== newGenSwipes.swipe_id) {
                 const swipeGen = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
-                if(swipeGen === "...") {
+                if (swipeGen === "...") {
                     saveData()
                     return
                 }
                 input = swipeGen
-                swiped = false
+                currSwipeId = newGenSwipes.swipe_id
+                toCut = true
             }
             //main script func here
             encryptFragments()
             updateInput()
             updateFragments()
-            updateAIMes()
+            await updateAIMes()
             saveData()
 
 
@@ -207,10 +202,10 @@
 
 
             function onFragmentClick(e) {
-                if(removeCount <= 0) {
+                if (removeCount <= 0) {
                     return
                 }
-                
+
                 const elem = e.target
                 toReplace = toReplace.filter(fragment => fragment !== elem.innerText)
                 removeCount--
@@ -234,38 +229,38 @@
 
 
             function genCorruptFragment() {
-                const c = ["b","c","d","f","g","h","j","k","l","m","n","p","q","r","s","t","v","w","x","z"]
+                const c = ["b", "c", "d", "f", "g", "h", "j", "k", "l", "m", "n", "p", "q", "r", "s", "t", "v", "w", "x", "z"]
                 const v = ["a", "e", "i", "o", "u", "y"]
                 const patterns = ["cv", "cc", "vc", "vv"]
                 let output = ""
-                while(output === "" || containsString(toReplace, output)) {
+                while (output === "" || containsString(toReplace, output)) {
                     output = ""
-                    let len = [1,2,2,2,2]
+                    let len = [1, 2, 2, 2, 2]
                     let pattern = patterns[Math.floor(Math.random() * patterns.length)]
                     len = len[Math.floor(Math.random() * len.length)]
-                    if(len === 2) {
-                        switch(pattern) {
+                    if (len === 2) {
+                        switch (pattern) {
                             case "cv":
                                 output += c[Math.floor(Math.random() * c.length)]
                                 output += v[Math.floor(Math.random() * v.length)]
-                            break
+                                break
                             case "cc":
                                 output += c[Math.floor(Math.random() * c.length)]
                                 output += c[Math.floor(Math.random() * c.length)]
-                            break
+                                break
                             case "vc":
                                 output += v[Math.floor(Math.random() * v.length)]
                                 output += c[Math.floor(Math.random() * c.length)]
-                            break
+                                break
                             case "vv":
                                 output += v[Math.floor(Math.random() * v.length)]
                                 output += v[Math.floor(Math.random() * v.length)]
-                            break
+                                break
                             default: console.error("Error on gen corrupt fragment.")
                         }
                     }
                     else {
-                        let cv = [c,v]
+                        let cv = [c, v]
                         cv = cv[Math.floor(Math.random() * cv.length)]
                         output = cv[Math.floor(Math.random() * cv.length)]
                     }
@@ -280,7 +275,7 @@
             }
 
 
-            
+
             function atCount(count) {
                 const corrupt = ["#̷̶̴̸̶̢҉̷̷̷̸̨̡̨̢̛҉̴̴̶̡̨̢̨@̷̵̸̵̢̢̡̡̡̡̛̛҉̴̸̸̷̴̴̶̶̶̡̡", "#̵̛̳̬̽̀̐̿̑̎̀̄͊̅̄̂̂̋̐̆̍̑͌̈͛͊̈̌͊͌̀̈́̍́̈́̀̑́̃̈́́̿̂̍̎͂̐̆́͒̽̐́̎͂̅̇̀́̾̑͊̓͊̀̅̐͆̈́̓́̈́̓̎̀̉̒̕̚͠͝͝͠͠͝@̶̧̡̧̨̨̨̢̮̻̻͍͕͙̙̺̥̫̭̺̬̠̮̹̥̝̝͍͍̲̫̤͓̫̦̣͖̬̭̥̜̮̪̝̻̩̫͖̪̖̼̮͚̣̫͓̯͓̮̬̻̫̳̤͓̖͎̟̱̪̹̫̥̪̒̊̂͑͌́͊̂͋͆̌͑̈̍́̒̿̇̓̔̍̊̄̉̽͑̓̆̀̂̇̿̑̎̎̊͋͐͐̔̌̎͑̇̾̅͋͐̌̏̕͘͘͘͘͜͜͜͝͝ͅ", "☤ ̔̓#̴̑̀̔͘͟@̴̢̑͞ ☤", "🖎✁", "🖚🖌", "꧁꧂", "#̵̢̨̛̫̮̭̯͚̤̩̜͖͈̦̞͖̳̮̺͓͓͍͎̼̟̟̲̪̤̌̅̍̈̊̏̎̅̈́̈́̈́̏̈́̑́̎̈́͋̈͊̂̈́̌̀͗͛̈́̍́̒͗͂̽͒̾̈́̋́̾̈̅̓́̍́͂̄̀͗̓̆̿̔͋͂͑̀̀̈́̔̀̀̒̽̎̏͐͒͊̌̒̂͋͂͋̑̑̈́͒̔͆̒̈́͌̈́̕̕̕͘̚͜͝͝͝͠͠͝͠͝͝ͅ@̷̧̧̢̛̛̪̯̭̟̫̭̩̙͈̯̱̮̬̝̠̱͕̝͖̤̗͎̼̖̲͍́͂́́̎̅͗͑͒̎̽̇̅̈́̅̽̃̃̿̑͋̋̽̋̀̒̅̒̓͊͋͆̀̿̋̒͋̆̈́͊̓̇̇͑̌̐̽̀̈̌̊̈́̒̓̓̆̾̒͂̑́̆͛̂̏̌̅̓̾̐̍͌̑̏͑̔̆̓͋̔̂͛̔͋̚̚̚̕̚̕̕͠͝͝͝͠"]
                 let output = ""
@@ -323,7 +318,7 @@
 
                 const fragmentsArr = [...document.getElementsByClassName("fragment")]
                 changeFragmentsBGColor(fragmentsArr)
-                
+
                 fragmentsArr.forEach(element => {
                     element.addEventListener("click", onFragmentClick)
                 });
@@ -347,18 +342,24 @@
 
 
             //for AI message manipulation
-            //display the manipulated AI message
-            //hide the original AI message
-            function updateAIMes() {
+            async function updateAIMes() {
                 if (toCut) {
                     toCut = false
-                    triggerSlash(`/sendas name="{{char}}" ${input} |
-/sendas name="{{char}}" <details><summary>Original</summary>
+                    await saveData()
+
+                    const regexAlreadyModified = /<details>\s*<summary>Original<\/summary>/i
+                    if (regexAlreadyModified.test(input)) {
+                        return
+                    }
+
+                    const msg = `${input}
+
+<hr id="hide">
+
+<details><summary>Original</summary>
 ${origInput}
-</details> |
-/cut {{lastMessageId}} |
-/hide {{lastMessageId}}
-                    `)
+</details>`
+                    await setChatMessages([{ message_id: '{{lastMessageId}}', message: msg }], { refresh: "affected" })
                 }
             }
         })

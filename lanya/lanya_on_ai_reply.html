@@ -164,7 +164,7 @@
             //load chatdata
             let toReplace
             let toCut
-            let swiped
+            let currSwipeId
             let unlockCount
             let chatData = getVariables().chatData == null ? null : JSON.parse(getVariables()["chatData"])
             if (chatData == null) {
@@ -173,13 +173,13 @@
                 chatData = {}
                 toReplace = ["Lanya", "{{user}}"]
                 toCut = true
-                swiped = false
+                currSwipeId = 0
                 unlockCount = 5
             }
             else {
                 toReplace = chatData["toReplace"]
                 toCut = chatData["toCut"]
-                swiped = chatData["swiped"]
+                currSwipeId = chatData["currSwipeId"]
                 unlockCount = chatData["unlockCount"]
             }
 
@@ -188,7 +188,7 @@
                 chatData = {
                     "toReplace": toReplace,
                     "toCut": toCut,
-                    "swiped": swiped,
+                    "currSwipeId": currSwipeId,
                     "unlockCount": unlockCount,
                     "userMesEdited": false
                 }
@@ -256,31 +256,26 @@
 
 
             //swipe handler
-            eventOnce(tavern_events.MESSAGE_SWIPED, function () {
-                //change some data and save everything before swipe
-                swiped = true
-                toCut = true
-                saveData()
-            })
-            if (swiped) {
-                const swipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]["swipes"]
+            const swipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            if (currSwipeId !== newGenSwipes.swipe_id) {
                 const swipeGen = newGenSwipes["swipes"][newGenSwipes["swipe_id"]]
                 if (swipeGen === "...") {
                     saveData()
                     return
                 }
                 input = swipeGen
-                swiped = false
+                currSwipeId = newGenSwipes.swipe_id
+                toCut = true
             }
             preEncrypt()
             encryptDialogue()
             decryptFragments()
             updateFragments()
             updateInput()
-            updateAIMes()
-            saveData()
             updateUnlockUI()
-
+            await updateAIMes()
+            saveData()
+            
 
             function updateUnlockUI() {
                 if (unlockCount <= 0) {
@@ -462,16 +457,25 @@
             }
 
 
-            function updateAIMes() {
+            //for AI message manipulation
+            async function updateAIMes() {
                 if (toCut) {
                     toCut = false
-                    triggerSlash(`/sendas name="{{char}}" ${input} |
-/sendas name="{{char}}" <details><summary>Original</summary>
+                    await saveData()
+
+                    const regexAlreadyModified = /<details>\s*<summary>Original<\/summary>/i
+                    if (regexAlreadyModified.test(input)) {
+                        return
+                    }
+
+                    const msg = `${input}
+
+<hr id="hide">
+
+<details><summary>Original</summary>
 ${origInput}
-</details> |
-/cut {{lastMessageId}} |
-/hide {{lastMessageId}}
-                    `)
+</details>`
+                    await setChatMessages([{ message_id: '{{lastMessageId}}', message: msg }], { refresh: "affected" })
                 }
             }
         })

@@ -65,18 +65,24 @@
 
 
         let gameOver
-        let swiped
         let aiMesChanged
         let userMesEdited
+        let currSwipeId
         let expectingOutputOnId
         let chatData
         let chatDataHist
         let toUserProcess = {}
         function loadChatData() {
+            //with history
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
             chatData = chatDataHist[chatMessages.message_id-1]
+            
+            //without history
+            // chatData = getVariables().chatData == null ? null : JSON.parse(getVariables().chatData)
+
             gameOver = chatData.gameOver
             userMesEdited = chatData.userMesEdited
+            currSwipeId = chatData.currSwipeId
             toUserProcess = chatData.toUserProcess
         }
 
@@ -84,10 +90,12 @@
         const MAX_CHATDATA_HISTORY = 20
         async function saveData() {
             chatData.gameOver = gameOver
-            chatData.swiped = false
             chatData.aiMesChanged = false
+            chatData.currSwipeId = 0
             chatData.expectingOutputOnId = toUserProcess.expectingOutputOnId === "next" ? Number.parseInt(chatMessages.message_id) + 1 : -1
             chatData.userMesEdited = userMesEdited
+
+            //with history
             chatDataHist[chatMessages.message_id] = chatData
             const keys = Object.keys(chatDataHist)
             const diff = keys.length - MAX_CHATDATA_HISTORY
@@ -97,6 +105,9 @@
                 }
             }
             await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
+
+            //without history
+            // await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
 

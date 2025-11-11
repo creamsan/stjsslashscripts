@@ -115,7 +115,7 @@
                 chatData["removeCount"] = removeCount
                 chatData["toReplace"] = toReplace
                 chatData["userMesEdited"] = userMesEdited
-                chatData["swiped"] = false
+                chatData["currSwipeId"] = 0
                 triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
             }
         })

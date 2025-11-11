@@ -187,7 +187,6 @@
 
         let toJB = ""
         let gameOver
-        let swiped
         let toCut
         let userMesEdited
         let expectingOutputOnId
@@ -202,13 +201,11 @@
                 chatData = {}
                 chatDataHist = {}
                 gameOver = false
-                swiped = false
                 toCut = true
                 expectingOutputOnId = -1
             }
             else {
                 gameOver = chatData.gameOver
-                swiped = chatData.swiped
                 toCut = chatData.toCut
                 expectingOutputOnId = chatData.expectingOutputOnId
             }
@@ -218,7 +215,6 @@
         //ai side
         async function saveData() {
             chatData.gameOver = gameOver
-            chatData.swiped = swiped
             chatData.toCut = toCut
             chatData.userMesEdited = false
             chatData.toUserProcess = toUserProcess

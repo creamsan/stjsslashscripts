@@ -109,27 +109,32 @@
 
         let toJB = ""
         let gameOver
-        let swiped
         let aiMesChanged
         let userMesEdited
+        let currSwipeId
         let expectingOutputOnId
         let chatData
         let chatDataHist
         let toUserProcess = {}
         function loadChatData() {
+            //with history
             chatDataHist = getVariables().chatDataHist == null ? null : JSON.parse(getVariables().chatDataHist)
-            chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id-1]
+            chatData = chatDataHist == null ? null : chatDataHist[chatMessages.message_id - 1]
+
+            //without history
+            // chatData = getVariables().chatData == null ? null : JSON.parse[getVariables().chatData]
+
             if (chatData == null) {
                 chatData = {}
                 chatDataHist = {}
                 gameOver = false
-                swiped = false
                 aiMesChanged = false
+                userMesEdited = false
                 expectingOutputOnId = -1
+                currSwipeId = 0
             }
             else {
                 gameOver = chatData.gameOver
-                swiped = chatData.swiped
                 aiMesChanged = chatData.aiMesChanged
                 expectingOutputOnId = chatData.expectingOutputOnId
             }
@@ -138,12 +143,17 @@
 
         async function saveData() {
             chatData.gameOver = gameOver
-            chatData.swiped = swiped
             chatData.aiMesChanged = aiMesChanged
             chatData.userMesEdited = false
             chatData.toUserProcess = toUserProcess
+            chatData.currSwipeId = currSwipeId
+
+            //with history
             chatDataHist[chatMessages.message_id] = chatData
             await triggerSlash(`/setvar key=chatDataHist ${JSON.stringify(chatDataHist)}`)
+
+            //without history
+            // await triggerSlash(`/setvar key=chatData ${JSON.stringify(chatData)}`)
         }
 
 
@@ -179,40 +189,40 @@
 
 
         async function handleSwipe() {
-            eventOnce(tavern_events.MESSAGE_SWIPED, async function () {
-                //change some data and save everything before swipe
-                swiped = true
-                await saveData()
-            })
-            if (swiped) {
-                const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0].swipes
-                const swipeGen = newGenSwipes[newGenSwipes.length - 1]
+            const newGenSwipes = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            if (currSwipeId !== newGenSwipes.swipe_id) {
+                const swipeGen = newGenSwipes.swipes[newGenSwipes.swipe_id]
                 if (swipeGen === "...") {
                     await saveData()
                     return true
                 }
                 input = swipeGen
-                swiped = false
+                currSwipeId = newGenSwipes.swipe_id
+                aiMesChanged = false
+                return false
             }
-            return false
         }
 
 
-        function modifyAIMes(msg, origMsg) {
-            // note: hacky - fix later 
-            // send the modified AI message
-            // send the orig AI message as hidden
-            // hide the modified AI message
-            // cut the unmodified ai message
+        //for AI message manipulation
+        async function modifyAIMes(msg, origMsg) {
             if (aiMesChanged === false) {
                 aiMesChanged = true
-                triggerSlash(`/sendas name="{{char}}" ${msg} |
-                    /sendas name="{{char}}" <details><summary>Original</summary>
+                await saveData()
+
+                const regexAlreadyModified = /<details>\s*<summary>Original<\/summary>/i
+                if (regexAlreadyModified.test(msg)) {
+                    return
+                }
+
+                const toMsg = `${msg}
+
+<hr id="hide">
+
+<details><summary>Original</summary>
 ${origMsg}
-</details> |
-                    /cut {{lastMessageId}} |
-                    /hide {{lastMessageId}}
-                `)
+</details>`
+                await setChatMessages([{ message_id: '{{lastMessageId}}', message: toMsg }], { refresh: "affected" })
             }
         }
 
@@ -255,7 +265,7 @@ ${origMsg}
 
         }
 
-        
+
         async function updateJB() {
             await insertOrAssignVariables({ jbout: toJB })
             toJB = ""
