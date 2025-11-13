@@ -1,0 +1,1060 @@
+{{match}}
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- <script src="https://unpkg.com/kaplay@4000.0.0-alpha.22/dist/kaplay.js"></script> -->
+    <script src="https://d3js.org/d3.v6.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.8em;
+            margin: 0;
+            width: 100%;
+            height: fit-content;
+        }
+
+        #main_cont {
+            margin: 0 auto;
+            width: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            /* background-color: aqua; */
+        }
+
+        canvas {
+            margin: 0 auto;
+        }
+
+        #error {
+            margin: 0 auto;
+            width: 400px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            border-radius: 7px;
+            background-color: rgb(185, 185, 185);
+            padding: 5px;
+        }
+
+        #ignore_btn {
+            background-color: rgb(184, 48, 48);
+        }
+
+        .stylized-button {
+            color: white;
+            padding: 3px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .stylized-button:hover {
+            transform: scale(1.05);
+        }
+
+        .stylized-button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div id="error_msg">
+            The AI did not generate the expected output. Please swipe or regenerate. If this is the intro, you
+            should ignore this.
+        </div>
+        <button class="stylized-button" id="ignore_btn">Ignore</button>
+    </div>
+    <div id="main_cont">
+        <div id="graph"></div>
+    </div>
+
+    <script>
+        const main_cont = document.getElementById("main_cont")
+
+
+        const error = document.getElementById("error")
+        function initError() {
+            const error_msg = document.getElementById("error_msg")
+            const errorIgnoreBtn = document.getElementById("ignore_btn")
+            errorIgnoreBtn.addEventListener("click", function () {
+                main_cont.style.display = "flex"
+                error.style.display = "none"
+            })
+        }
+
+
+        let chatMessages
+        let input
+        async function loadAIReply() {
+            chatMessages = await getChatMessages('{{lastMessageId}}', { include_swipes: true })[0]
+            input = chatMessages.swipes[chatMessages.swipe_id]
+            const regexInput = /<graph>([\S\s](?!<graph>))+?<\/graph>/i
+            input = regexInput.test(input) ? (input.match(regexInput))[0] : ""
+        }
+
+
+        function verifyInputs(toVerify) {
+            // if (gameOver) {
+            //     main_cont.parentNode.removeChild(main_cont)
+            //     return false
+            // }
+
+            // const mesId = chatMessages.message_id
+
+            if (input == "") {
+                main_cont.style.display = "none"
+                error.style.display = "flex"
+                return false
+            }
+
+            for (const element of toVerify) {
+                if (element == "") {
+                    main_cont.style.display = "none"
+                    error.style.display = "flex"
+                    return false
+                }
+            }
+
+            // if (mesId === 0 || expectingOutputOnId != mesId) {
+            //     main_cont.style.display = "none"
+            //     error.style.display = "none"
+            // }
+
+            return true
+        }
+
+
+        //main
+        document.addEventListener("DOMContentLoaded", async function () {
+            // initError()
+            // await loadAIReply()
+
+            //intro handler - for multi intro cards
+            // if (chatMessages.message_id === 0) {
+
+            // }
+
+            //regexes here
+            const regexVar = /regex/i
+            const toVer = regexVar.test(input) ? input.match(regexVar)[0] : ""
+            const graph = "pie chart"
+            //heatmap sample
+            // const data = [
+            //     { group: "a", x: "v1", y: 10 },
+            //     { group: "a", x: "v2", y: 100 },
+            //     { group: "a", x: "v3", y: 4 },
+            //     { group: "b", x: "v1", y: 75 },
+            //     { group: "b", x: "v2", y: 12 },
+            //     { group: "b", x: "v3", y: 88 },
+            //     { group: "c", x: "v1", y: 100 },
+            //     { group: "c", x: "v2", y: 99 },
+            //     { group: "c", x: "v3", y: 88 },
+            //     { group: "d", x: "v1", y: 99 },
+            //     { group: "d", x: "v2", y: 20 },
+            //     { group: "d", x: "v3", y: 18 },
+            // ]
+            //scatter plot sample, line chart
+            // const data = [
+            //     { x: 0, y: 10 },
+            //     { x: 1, y: 100 },
+            //     { x: 2, y: 4 },
+            //     { x: 3, y: 75 },
+            //     { x: 4, y: 12 },
+            //     { x: 5, y: 88 },
+            //     { x: 6, y: 100 },
+            //     { x: 7, y: 99 },
+            //     { x: 8, y: 88 },
+            //     { x: 9, y: 99 },
+            //     { x: 10, y: 20 },
+            //     { x: 11, y: 18 },
+            // ]
+            //bar plot sample, pie chart
+            const data = [
+                { x: "wah", y: 10 },
+                { x: "aaaa", y: 100 },
+                { x: "wssdah", y: 4 },
+                { x: "waasdfh", y: 75 },
+                { x: "fds", y: 12 },
+                { x: "fsa", y: 88 },
+                { x: "asd", y: 100 },
+                { x: "ggds", y: 99 }
+            ]
+            //nodes sample
+            // const data = {
+            //     "nodes": [
+            //         {
+            //             "id": 1,
+            //             "name": "A"
+            //         },
+            //         {
+            //             "id": 2,
+            //             "name": "B"
+            //         },
+            //         {
+            //             "id": 3,
+            //             "name": "C"
+            //         }
+            //     ],
+            //     "links": [
+            //         {
+            //             "source": 1,
+            //             "target": 2
+            //         },
+            //         {
+            //             "source": 1,
+            //             "target": 3
+            //         },
+            //     ]
+            // }
+            // const data = [
+            //     { name: "Afghanistan", c: "Asia", y: 43.828, r: 31889923, x: 974.5803384 },
+            //     { name: "Albania", c: "Europe", y: 76.423, r: 3600523, x: 5937.029526 },
+            //     { name: "Algeria", c: "Africa", y: 72.301, r: 33333216, x: 6223.367465 },
+            //     { name: "Angola", c: "Africa", y: 42.731, r: 12420476, x: 4797.231267 },
+            //     { name: "Argentina", c: "Americas", y: 75.32, r: 40301927, x: 12779.37964 },
+            // ]
+            //radar chart sample
+            // const data = [
+            //     [
+            //         { axis: "Doggy", value: 0.22 },
+            //         { axis: "Big", value: 0.28 },
+            //         { axis: "Ass", value: 0.29 },
+            //     ],
+            //     [
+            //         { axis: "Doggy", value: 0.27 },
+            //         { axis: "Big", value: 0.16 },
+            //         { axis: "Ass", value: 0.35 },
+            //     ]
+            // ];
+
+
+            const toVerify = []
+            if (verifyInputs(toVerify) === false) {
+                await saveData()
+                return
+            }
+
+            // if (await handleSwipe()) return
+
+            //main func start here
+            switch (graph) {
+                case "heatmap":
+                    drawHeatmap(data)
+                    break
+                case "scatter plot":
+                    drawScatterPlot(data)
+                    break
+                case "barplot":
+                    drawBarPlot(data)
+                    break
+                case "pie chart":
+                    drawPieChart(data)
+                    break
+                case "line chart":
+                    drawLineChart(data)
+                    break
+                case "network graph":
+                    drawNetwork(data)
+                    break
+                case "colored bubble plot":
+                    drawColoredBubblePlot(data)
+                    break
+                case "radar chart":
+                    drawRadarChart(data)
+                    break
+                default:
+                    console.error("Error on selecting chart")
+            }
+
+
+            // prepToUserProcess()
+            // await updateJB()
+        })
+
+
+        function prepToUserProcess() {
+            //process stuff to be updated on user side
+
+        }
+
+
+        async function updateJB() {
+            await insertOrAssignVariables({ jbout: toJB })
+            toJB = ""
+        }
+
+
+        /*****************************************************************
+        credits: The D3.js Graph Gallery - https://d3-graph-gallery.com
+        *****************************************************************/
+
+        function drawHeatmap(data) {
+            // set the dimensions and margins of the graph
+            const margin = { top: 30, right: 30, bottom: 30, left: 30 },
+                width = 450 - margin.left - margin.right,
+                height = 450 - margin.top - margin.bottom;
+
+            // append the svg object to the body of the page
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Labels of row and columns
+            // const myGroups = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+            // const myVars = ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"]
+            const myGroups = data.map(e => e.group)
+            const myVars = data.map(e => e.x)
+
+            // Build X scales and axis:
+            const x = d3.scaleBand()
+                .range([0, width])
+                .domain(myGroups)
+                .padding(0.01);
+            svg.append("g")
+                .attr("transform", `translate(0, ${height})`)
+                .call(d3.axisBottom(x))
+
+            // Build X scales and axis:
+            const y = d3.scaleBand()
+                .range([height, 0])
+                .domain(myVars)
+                .padding(0.01);
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // Build color scale
+            const myColor = d3.scaleLinear()
+                .range(["white", "#69b3a2"])
+                .domain([1, 100])
+
+            //Read the data
+
+            // create a tooltip
+            const tooltip = d3.select("#graph")
+                .append("div")
+                .style("opacity", 0)
+                .attr("class", "tooltip")
+                .style("background-color", "white")
+                .style("border", "solid")
+                .style("border-width", "2px")
+                .style("border-radius", "5px")
+                .style("padding", "5px")
+
+            // Three function that change the tooltip when user hover / move / leave a cell
+            const mouseover = function (event, d) {
+                tooltip.style("opacity", 1)
+            }
+            const mousemove = function (event, d) {
+                tooltip
+                    .html("Val: " + d.y)
+                    .style("left", (event.x + 70) + "px")
+                    .style("top", event.y + "px")
+            }
+            const mouseleave = function (d) {
+                tooltip.style("opacity", 0)
+            }
+
+            // add the squares
+            svg.selectAll()
+                .data(data, function (d) { return d.group + ':' + d.x; })
+                .enter()
+                .append("rect")
+                .attr("x", function (d) { return x(d.group) })
+                .attr("y", function (d) { return y(d.x) })
+                .attr("width", x.bandwidth())
+                .attr("height", y.bandwidth())
+                .style("fill", function (d) { return myColor(d.y) })
+                .on("mouseover", mouseover)
+                .on("mousemove", mousemove)
+                .on("mouseleave", mouseleave)
+        }
+
+
+        function drawScatterPlot(data) {
+            // set the dimensions and margins of the graph
+            const margin = { top: 10, right: 30, bottom: 30, left: 60 },
+                width = 460 - margin.left - margin.right,
+                height = 400 - margin.top - margin.bottom;
+
+            // append the svg object to the body of the page
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Add X axis
+            const x = d3.scaleLinear()
+                .domain([d3.min(data, d => d.x) - 3, d3.max(data, d => d.x) + 3])
+                .range([0, width]);
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x));
+            // Add Y axis
+            const y = d3.scaleLinear()
+                .domain([d3.min(data, d => d.y) - 3, d3.max(data, d => d.y) + 3])
+                .range([height, 0]);
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // Add the points
+            svg
+                .append("g")
+                .selectAll("dot")
+                .data(data)
+                .join("circle")
+                .attr("cx", d => x(d.x))
+                .attr("cy", d => y(d.y))
+                .attr("r", 5)
+                .attr("fill", "#69b3a2")
+        }
+
+
+        function drawBarPlot(data) {
+            // set the dimensions and margins of the graph
+            const margin = { top: 30, right: 30, bottom: 70, left: 60 },
+                width = 460 - margin.left - margin.right,
+                height = 400 - margin.top - margin.bottom;
+
+            // append the svg object to the body of the page
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // X axis
+            const x = d3.scaleBand()
+                .range([0, width])
+                .domain(data.map(d => d.x))
+                .padding(0.2);
+            svg.append("g")
+                .attr("transform", `translate(0, ${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")
+                .attr("transform", "translate(-10,0)rotate(-45)")
+                .style("text-anchor", "end");
+
+            // Add Y axis
+            const y = d3.scaleLinear()
+                .domain([d3.min(data, d => d.y), d3.max(data, d => d.y)])
+                .range([height, 0]);
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // Bars
+            svg.selectAll("mybar")
+                .data(data)
+                .join("rect")
+                .attr("x", d => x(d.x))
+                .attr("y", d => y(d.y))
+                .attr("width", x.bandwidth())
+                .attr("height", d => height - y(d.y))
+                .attr("fill", "#69b3a2")
+        }
+
+
+        function drawPieChart(fData) {
+            const width = 450,
+                height = 450,
+                margin = 40;
+
+            // The radius of the pieplot is half the width or half the height (smallest one). I subtract a bit of margin.
+            const radius = Math.min(width, height) / 2 - margin
+
+            // append the svg object to the div called 'my_dataviz'
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .append("g")
+                .attr("transform", `translate(${width / 2},${height / 2})`);
+
+            const data = fData.reduce((accumulator, current) => {
+                accumulator[current.x] = current.y;
+                return accumulator;
+            }, {});
+
+            // set the color scale
+            const color = d3.scaleOrdinal()
+                .domain(Object.keys(data))
+                .range(d3.schemeDark2);
+
+            // Compute the position of each group on the pie:
+            const pie = d3.pie()
+                .sort(null) // Do not sort group by size
+                .value(d => d[1])
+            const data_ready = pie(Object.entries(data))
+
+            // The arc generator
+            const arc = d3.arc()
+                .innerRadius(radius * 0.5)         // This is the size of the donut hole
+                .outerRadius(radius * 0.8)
+
+            // Another arc that won't be drawn. Just for labels positioning
+            const outerArc = d3.arc()
+                .innerRadius(radius * 0.9)
+                .outerRadius(radius * 0.9)
+
+            // Build the pie chart: Basically, each part of the pie is a path that we build using the arc function.
+            svg
+                .selectAll('allSlices')
+                .data(data_ready)
+                .join('path')
+                .attr('d', arc)
+                .attr('fill', d => color(d.data[1]))
+                .attr("stroke", "white")
+                .style("stroke-width", "2px")
+                .style("opacity", 0.7)
+
+            // Add the polylines between chart and labels:
+            svg
+                .selectAll('allPolylines')
+                .data(data_ready)
+                .join('polyline')
+                .attr("stroke", "black")
+                .style("fill", "none")
+                .attr("stroke-width", 1)
+                .attr('points', function (d) {
+                    const posA = arc.centroid(d) // line insertion in the slice
+                    const posB = outerArc.centroid(d) // line break: we use the other arc generator that has been built only for that
+                    const posC = outerArc.centroid(d); // Label position = almost the same as posB
+                    const midangle = d.startAngle + (d.endAngle - d.startAngle) / 2 // we need the angle to see if the X position will be at the extreme right or extreme left
+                    posC[0] = radius * 0.95 * (midangle < Math.PI ? 1 : -1); // multiply by 1 or -1 to put it on the right or on the left
+                    return [posA, posB, posC]
+                })
+
+            // Add the polylines between chart and labels:
+            svg
+                .selectAll('allLabels')
+                .data(data_ready)
+                .join('text')
+                .text(d => d.data[0])
+                .attr('transform', function (d) {
+                    const pos = outerArc.centroid(d);
+                    const midangle = d.startAngle + (d.endAngle - d.startAngle) / 2
+                    pos[0] = radius * 0.99 * (midangle < Math.PI ? 1 : -1);
+                    return `translate(${pos})`;
+                })
+                .style('text-anchor', function (d) {
+                    const midangle = d.startAngle + (d.endAngle - d.startAngle) / 2
+                    return (midangle < Math.PI ? 'start' : 'end')
+                })
+        }
+
+
+        function drawLineChart(data) {
+            // set the dimensions and margins of the graph
+            var margin = { top: 10, right: 30, bottom: 30, left: 60 },
+                width = 460 - margin.left - margin.right,
+                height = 400 - margin.top - margin.bottom;
+
+            // append the svg object to the body of the page
+            var svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")");
+
+            // Add X axis --> it is a date format
+            var x = d3.scaleLinear()
+                .domain([d3.min(data, d => d.x), d3.max(data, d => d.x)])
+                .range([0, width]);
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x));
+
+            // Add Y axis
+            var y = d3.scaleLinear()
+                .domain([d3.min(data, d => d.y), d3.max(data, d => d.y)])
+                .range([height, 0]);
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // Add the area
+            svg.append("path")
+                .datum(data)
+                .attr("fill", "#cce5df")
+                .attr("stroke", "#69b3a2")
+                .attr("stroke-width", 1.5)
+                .attr("d", d3.area()
+                    .x(function (d) { return x(d.x) })
+                    .y0(y(0))
+                    .y1(function (d) { return y(d.y) })
+                )
+
+        }
+
+
+        function drawNetwork(data) {
+            const margin = { top: 10, right: 30, bottom: 30, left: 40 },
+                width = 400 - margin.left - margin.right,
+                height = 400 - margin.top - margin.bottom;
+
+            // append the svg object to the body of the page
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform",
+                    `translate(${margin.left}, ${margin.top})`);
+
+            // Initialize the links
+            const link = svg
+                .selectAll("line")
+                .data(data.links)
+                .join("line")
+                .style("stroke", "#aaa")
+
+            // Initialize the nodes
+            const node = svg
+                .selectAll("circle")
+                .data(data.nodes)
+                .join("circle")
+                .attr("r", 20)
+                .style("fill", "#69b3a2")
+
+            // Add node names
+            const labels = svg
+                .selectAll("text")
+                .data(data.nodes)
+                .join("text")
+                .attr("dy", ".35em")
+                .attr("x", 6)
+                .attr("y", -6)
+                .style("font-size", "12px")
+                .text(d => d.name);
+
+            // Let's list the force we wanna apply on the network
+            const simulation = d3.forceSimulation(data.nodes)                 // Force algorithm is applied to data.nodes
+                .force("link", d3.forceLink()                               // This force provides links between nodes
+                    .id(function (d) { return d.id; })                     // This provide  the id of a node
+                    .links(data.links)                                    // and this the list of links
+                )
+                .force("charge", d3.forceManyBody().strength(-400))         // This adds repulsion between nodes. Play with the -400 for the repulsion strength
+                .force("center", d3.forceCenter(width / 2, height / 2))     // This force attracts nodes to the center of the svg area
+                .on("end", ticked);
+
+            // This function is run at each iteration of the force algorithm, updating the nodes position.
+            function ticked() {
+                link
+                    .attr("x1", function (d) { return d.source.x; })
+                    .attr("y1", function (d) { return d.source.y; })
+                    .attr("x2", function (d) { return d.target.x; })
+                    .attr("y2", function (d) { return d.target.y; });
+
+                node
+                    .attr("cx", function (d) { return d.x + 6; })
+                    .attr("cy", function (d) { return d.y - 6; });
+
+                labels
+                    .attr("x", function (d) { return d.x - 5; })
+                    .attr("y", function (d) { return d.y - 5; });
+            }
+        }
+
+
+        function drawColoredBubblePlot(data) {
+            // set the dimensions and margins of the graph
+            const margin = { top: 10, right: 20, bottom: 30, left: 50 },
+                width = 500 - margin.left - margin.right,
+                height = 420 - margin.top - margin.bottom;
+
+            // append the svg object to the body of the page
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Add X axis
+            const x = d3.scaleLinear()
+                .domain([d3.min(data, d => d.x), d3.max(data, d => d.x)])
+                .range([0, width]);
+            svg.append("g")
+                .attr("transform", `translate(0, ${height})`)
+                .call(d3.axisBottom(x));
+
+            // Add Y axis
+            const y = d3.scaleLinear()
+                .domain([d3.min(data, d => d.y), d3.max(data, d => d.y)])
+                .range([height, 0]);
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // Add a scale for bubble size
+            const z = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.r)])
+                .range([1, 50]);
+
+            // Add a scale for bubble color
+            const myColor = d3.scaleOrdinal()
+                .domain(data.map(d => d.name))
+                .range(d3.schemeSet2);
+
+            // -1- Create a tooltip div that is hidden by default:
+            const tooltip = d3.select("#graph")
+                .append("div")
+                .style("opacity", 0)
+                .attr("class", "tooltip")
+                .style("background-color", "black")
+                .style("border-radius", "5px")
+                .style("padding", "10px")
+                .style("color", "white")
+
+            // -2- Create 3 functions to show / update (when mouse move but stay on same circle) / hide the tooltip
+            const showTooltip = function (event, d) {
+                tooltip
+                    .transition()
+                    .duration(200)
+                tooltip
+                    .style("opacity", 1)
+                    .html("Name: " + d.name)
+                    .style("left", (event.x) / 2 + "px")
+                    .style("top", (event.y) / 2 + 30 + "px")
+            }
+            const hideTooltip = function (event, d) {
+                tooltip
+                    .style("opacity", 0)
+            }
+
+            // Add dots
+            svg.append('g')
+                .selectAll("dot")
+                .data(data)
+                .join("circle")
+                .attr("class", "bubbles")
+                .attr("cx", d => x(d.x))
+                .attr("cy", d => y(d.y))
+                .attr("r", d => z(d.r))
+                .style("fill", d => myColor(d.c))
+                // -3- Trigger the functions
+                .on("mouseover", showTooltip)
+                .on("mouseleave", hideTooltip)
+        }
+
+
+        /*********************************************************
+        credits: Radar Chart by "Nadieh Bremer | Visual Cinnamon (VisualCinnamon.com)" 
+        *********************************************************/
+        function drawRadarChart(data) {
+            var margin = { top: 100, right: 100, bottom: 100, left: 100 },
+                width = Math.min(700, window.innerWidth - 10) - margin.left - margin.right,
+                height = Math.min(width, window.innerHeight - margin.top - margin.bottom - 20);
+
+            ////////////////////////////////////////////////////////////// 
+            //////////////////// Draw the Chart ////////////////////////// 
+            ////////////////////////////////////////////////////////////// 
+
+            var color = d3.scaleOrdinal()
+                .range(["#EDC951", "#CC333F", "#00A0B0"]);
+
+            var radarChartOptions = {
+                w: width,
+                h: height,
+                margin: margin,
+                maxValue: 0.5,
+                levels: 5,
+                roundStrokes: true,
+                color: color
+            };
+            //Call function to draw the Radar chart
+            RadarChart("#graph", data, radarChartOptions);
+
+            function RadarChart(id, data, options) {
+                var cfg = {
+                    w: 600,				//Width of the circle
+                    h: 600,				//Height of the circle
+                    margin: { top: 20, right: 20, bottom: 20, left: 20 }, //The margins of the SVG
+                    levels: 3,				//How many levels or inner circles should there be drawn
+                    maxValue: 0, 			//What is the value that the biggest circle will represent
+                    labelFactor: 1.25, 	//How much farther than the radius of the outer circle should the labels be placed
+                    wrapWidth: 60, 		//The number of pixels after which a label needs to be given a new line
+                    opacityArea: 0.35, 	//The opacity of the area of the blob
+                    dotRadius: 4, 			//The size of the colored circles of each blog
+                    opacityCircles: 0.1, 	//The opacity of the circles of each blob
+                    strokeWidth: 2, 		//The width of the stroke around each blob
+                    roundStrokes: false,	//If true the area and stroke will follow a round path (cardinal-closed)
+                    color: d3.scaleOrdinal(d3.schemeCategory10)	//Color function
+                };
+
+                //Put all of the options into a variable called cfg
+                if ('undefined' !== typeof options) {
+                    for (var i in options) {
+                        if ('undefined' !== typeof options[i]) { cfg[i] = options[i]; }
+                    }//for i
+                }//if
+
+                //If the supplied maxValue is smaller than the actual one, replace by the max in the data
+                var maxValue = Math.max(cfg.maxValue, d3.max(data, function (i) { return d3.max(i.map(function (o) { return o.value; })) }));
+
+                var allAxis = (data[0].map(function (i, j) { return i.axis })),	//Names of each axis
+                    total = allAxis.length,					//The number of different axes
+                    radius = Math.min(cfg.w / 2, cfg.h / 2), 	//Radius of the outermost circle
+                    Format = d3.format('%'),			 	//Percentage formatting
+                    angleSlice = Math.PI * 2 / total;		//The width in radians of each "slice"
+
+                //Scale for the radius
+                var rScale = d3.scaleLinear()
+                    .range([0, radius])
+                    .domain([0, maxValue]);
+
+                /////////////////////////////////////////////////////////
+                //////////// Create the container SVG and g /////////////
+                /////////////////////////////////////////////////////////
+
+                //Remove whatever chart with the same id/class was present before
+                d3.select(id).select("svg").remove();
+
+                //Initiate the radar chart SVG
+                var svg = d3.select(id).append("svg")
+                    .attr("width", cfg.w + cfg.margin.left + cfg.margin.right)
+                    .attr("height", cfg.h + cfg.margin.top + cfg.margin.bottom)
+                    .attr("class", "radar" + id);
+                //Append a g element		
+                var g = svg.append("g")
+                    .attr("transform", "translate(" + (cfg.w / 2 + cfg.margin.left) + "," + (cfg.h / 2 + cfg.margin.top) + ")");
+
+                /////////////////////////////////////////////////////////
+                ////////// Glow filter for some extra pizzazz ///////////
+                /////////////////////////////////////////////////////////
+
+                //Filter for the outside glow
+                var filter = g.append('defs').append('filter').attr('id', 'glow'),
+                    feGaussianBlur = filter.append('feGaussianBlur').attr('stdDeviation', '2.5').attr('result', 'coloredBlur'),
+                    feMerge = filter.append('feMerge'),
+                    feMergeNode_1 = feMerge.append('feMergeNode').attr('in', 'coloredBlur'),
+                    feMergeNode_2 = feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+                /////////////////////////////////////////////////////////
+                /////////////// Draw the Circular grid //////////////////
+                /////////////////////////////////////////////////////////
+
+                //Wrapper for the grid & axes
+                var axisGrid = g.append("g").attr("class", "axisWrapper");
+
+                //Draw the background circles
+                axisGrid.selectAll(".levels")
+                    .data(d3.range(1, (cfg.levels + 1)).reverse())
+                    .enter()
+                    .append("circle")
+                    .attr("class", "gridCircle")
+                    .attr("r", function (d, i) { return radius / cfg.levels * d; })
+                    .style("fill", "#CDCDCD")
+                    .style("stroke", "#CDCDCD")
+                    .style("fill-opacity", cfg.opacityCircles)
+                    .style("filter", "url(#glow)");
+
+                //Text indicating at what % each level is
+                axisGrid.selectAll(".axisLabel")
+                    .data(d3.range(1, (cfg.levels + 1)).reverse())
+                    .enter().append("text")
+                    .attr("class", "axisLabel")
+                    .attr("x", 4)
+                    .attr("y", function (d) { return -d * radius / cfg.levels; })
+                    .attr("dy", "0.4em")
+                    .style("font-size", "10px")
+                    .attr("fill", "#737373")
+                    .text(function (d, i) { return Format(maxValue * d / cfg.levels); });
+
+                /////////////////////////////////////////////////////////
+                //////////////////// Draw the axes //////////////////////
+                /////////////////////////////////////////////////////////
+
+                //Create the straight lines radiating outward from the center
+                var axis = axisGrid.selectAll(".axis")
+                    .data(allAxis)
+                    .enter()
+                    .append("g")
+                    .attr("class", "axis");
+                //Append the lines
+                axis.append("line")
+                    .attr("x1", 0)
+                    .attr("y1", 0)
+                    .attr("x2", function (d, i) { return rScale(maxValue * 1.1) * Math.cos(angleSlice * i - Math.PI / 2); })
+                    .attr("y2", function (d, i) { return rScale(maxValue * 1.1) * Math.sin(angleSlice * i - Math.PI / 2); })
+                    .attr("class", "line")
+                    .style("stroke", "white")
+                    .style("stroke-width", "2px");
+
+                //Append the labels at each axis
+                axis.append("text")
+                    .attr("class", "legend")
+                    .style("font-size", "11px")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", "0.35em")
+                    .attr("x", function (d, i) { return rScale(maxValue * cfg.labelFactor) * Math.cos(angleSlice * i - Math.PI / 2); })
+                    .attr("y", function (d, i) { return rScale(maxValue * cfg.labelFactor) * Math.sin(angleSlice * i - Math.PI / 2); })
+                    .text(function (d) { return d })
+                    .call(wrap, cfg.wrapWidth);
+
+                /////////////////////////////////////////////////////////
+                ///////////// Draw the radar chart blobs ////////////////
+                /////////////////////////////////////////////////////////
+
+                //The radial line function
+                var radarLine = d3.lineRadial()
+                    .curve(d3.curveLinearClosed)
+                    .radius(function (d) { return rScale(d.value); })
+                    .angle(function (d, i) { return i * angleSlice; });
+
+                if (cfg.roundStrokes) {
+                    radarLine.curve(d3.curveCardinalClosed)
+                }
+
+                //Create a wrapper for the blobs	
+                var blobWrapper = g.selectAll(".radarWrapper")
+                    .data(data)
+                    .enter().append("g")
+                    .attr("class", "radarWrapper");
+
+                //Append the backgrounds	
+                blobWrapper
+                    .append("path")
+                    .attr("class", "radarArea")
+                    .attr("d", function (d, i) { return radarLine(d); })
+                    .style("fill", function (d, i) { return cfg.color(i); })
+                    .style("fill-opacity", cfg.opacityArea)
+                    .on('mouseover', function (d, i) {
+                        //Dim all blobs
+                        d3.selectAll(".radarArea")
+                            .transition().duration(200)
+                            .style("fill-opacity", 0.1);
+                        //Bring back the hovered over blob
+                        d3.select(this)
+                            .transition().duration(200)
+                            .style("fill-opacity", 0.7);
+                    })
+                    .on('mouseout', function () {
+                        //Bring back all blobs
+                        d3.selectAll(".radarArea")
+                            .transition().duration(200)
+                            .style("fill-opacity", cfg.opacityArea);
+                    });
+
+                //Create the outlines	
+                blobWrapper.append("path")
+                    .attr("class", "radarStroke")
+                    .attr("d", function (d, i) { return radarLine(d); })
+                    .style("stroke-width", cfg.strokeWidth + "px")
+                    .style("stroke", function (d, i) { return cfg.color(i); })
+                    .style("fill", "none")
+                    .style("filter", "url(#glow)");
+
+                //Append the circles
+                blobWrapper.selectAll(".radarCircle")
+                    .data(function (d, i) { return d; })
+                    .enter().append("circle")
+                    .attr("class", "radarCircle")
+                    .attr("r", cfg.dotRadius)
+                    .attr("cx", function (d, i) { return rScale(d.value) * Math.cos(angleSlice * i - Math.PI / 2); })
+                    .attr("cy", function (d, i) { return rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2); })
+                    .style("fill", function (d, i, j) { return cfg.color(j); })
+                    .style("fill-opacity", 0.8);
+
+                /////////////////////////////////////////////////////////
+                //////// Append invisible circles for tooltip ///////////
+                /////////////////////////////////////////////////////////
+
+                //Wrapper for the invisible circles on top
+                var blobCircleWrapper = g.selectAll(".radarCircleWrapper")
+                    .data(data)
+                    .enter().append("g")
+                    .attr("class", "radarCircleWrapper");
+
+                //Append a set of invisible circles on top for the mouseover pop-up
+                blobCircleWrapper.selectAll(".radarInvisibleCircle")
+                    .data(function (d, i) { return d; })
+                    .enter().append("circle")
+                    .attr("class", "radarInvisibleCircle")
+                    .attr("r", cfg.dotRadius * 1.5)
+                    .attr("cx", function (d, i) { return rScale(d.value) * Math.cos(angleSlice * i - Math.PI / 2); })
+                    .attr("cy", function (d, i) { return rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2); })
+                    .style("fill", "none")
+                    .style("pointer-events", "all")
+                    .on("mouseover", function (d, i) {
+                        newX = parseFloat(d3.select(this).attr('cx')) - 10;
+                        newY = parseFloat(d3.select(this).attr('cy')) - 10;
+
+                        tooltip
+                            .attr('x', newX)
+                            .attr('y', newY)
+                            .text(Format(i.value))
+                            .transition().duration(200)
+                            .style('opacity', 1);
+                    })
+                    .on("mouseout", function () {
+                        tooltip.transition().duration(200)
+                            .style("opacity", 0);
+                    });
+
+                //Set up the small tooltip for when you hover over a circle
+                var tooltip = g.append("text")
+                    .attr("class", "tooltip")
+                    .style("opacity", 0);
+
+                /////////////////////////////////////////////////////////
+                /////////////////// Helper Function /////////////////////
+                /////////////////////////////////////////////////////////
+
+                //Taken from http://bl.ocks.org/mbostock/7555321
+                //Wraps SVG text	
+                function wrap(text, width) {
+                    text.each(function () {
+                        var text = d3.select(this),
+                            words = text.text().split(/\s+/).reverse(),
+                            word,
+                            line = [],
+                            lineNumber = 0,
+                            lineHeight = 1.4, // ems
+                            y = text.attr("y"),
+                            x = text.attr("x"),
+                            dy = parseFloat(text.attr("dy")),
+                            tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+
+                        while (word = words.pop()) {
+                            line.push(word);
+                            tspan.text(line.join(" "));
+                            if (tspan.node().getComputedTextLength() > width) {
+                                line.pop();
+                                tspan.text(line.join(" "));
+                                line = [word];
+                                tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                            }
+                        }
+                    });
+                }//wrap	
+
+            }//RadarChart
+        }
+
+    </script>
+</body>
+
+</html>
+```
