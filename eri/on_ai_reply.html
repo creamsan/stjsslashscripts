@@ -723,7 +723,7 @@
                 .attr("stroke-width", 1.5)
                 .attr("d", d3.area()
                     .x(function (d) { return x(d.x) })
-                    .y0(y(0))
+                    .y0(y(d3.min(data, d => d.y)))
                     .y1(function (d) { return y(d.y) })
                 )
         }
