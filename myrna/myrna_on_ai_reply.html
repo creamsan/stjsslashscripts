@@ -463,6 +463,30 @@ ${origMsg}
                 }
             })
 
+
+            //new word
+            onMouseRelease("right", function() {
+                const txtInputs = get("input")
+                txtInputs.forEach(t => {
+                    t.unuse("textInput")
+                    t.untag("input")
+                });
+                const txtInput = add([
+                    anchor("center"),
+                    text("Type a new word...", {
+                        size: TEXT_SIZE,
+                        font: "monospace",
+                        align: "center"
+                    }),
+                    textInput(),
+                    pos(mousePos()),
+                    area(),
+                    "word",
+                    "input"
+                ])
+                txtInput.focus()
+            })
+
         }
 
 
@@ -539,7 +563,7 @@ ${origMsg}
             const regexWords = /[\w]+/gi
             let words = getWords(regexWords, wordsFromAI)
             let extraWords = shuffleArray([...EXTRA_WORDS])
-            words = [...words, extraWords[0], extraWords[1], extraWords[2], extraWords[3], extraWords[4]]
+            words = [...words, extraWords[0], extraWords[1], extraWords[2]]
 
             initUI(dialogues, words)
 
