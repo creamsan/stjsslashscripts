@@ -841,7 +841,7 @@
 
         function verifyClothes() {
             const firstMes = chatMessages.swipes[chatMessages.swipes.length - 1]
-            const regexOpponentName = /(?<=<info>\s*Opponent's name:\s+)[\S\s]+?(?=\s+{{user}}'s clothes)/i
+            const regexOpponentName = /(?<=<info>\s*Opponent's name:\s+)[^\n]+?(?=\s+{{user}}'s clothes)/i
             if (regexOpponentName.test(firstMes)) {
                 opponentName = firstMes.match(regexOpponentName)[0]
                 poker.player2.name = opponentName

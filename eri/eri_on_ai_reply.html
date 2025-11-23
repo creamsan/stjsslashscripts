@@ -153,13 +153,13 @@
             await loadAIReply()
 
             //regexes here
-            const regexTitle = /(?<=Title:\s+)[\S\s]+(?=\s+Chart:)/i
+            const regexTitle = /(?<=Title:\s+)[^\n]+?(?=\s+Chart:)/i
             const title = regexTitle.test(input) ? input.match(regexTitle)[0] : ""
 
-            const regexGraph = /(?<=Chart:\s+)[\S\s]+(?=\s+CSV data:)/i
+            const regexGraph = /(?<=Chart:\s+)[^\n]+?(?=\s+CSV data:)/i
             const graph = regexGraph.test(input) ? input.match(regexGraph)[0] : ""
 
-            const regexData = /(?<=CSV data:\s+)[\S\s]+(?=\s+<\/graph>)/i
+            const regexData = /(?<=CSV data:\s+)[\S\s]+?(?=\s+<\/graph>)/i
             const data = regexData.test(input) ? input.match(regexData)[0] : ""
 
             const toVerify = [title, graph, data]
@@ -193,6 +193,9 @@
                         break
                     case "radar chart":
                         drawRadarChart(data, title)
+                        break
+                    case "2D spectrum graph":
+                        draw2DSpectrumGraph(data, title)
                         break
                     default:
                         console.error("Error on selecting chart")
@@ -328,23 +331,11 @@
                 w.size = w.size * SIZE >= WORD_SIZE_CAP ? WORD_SIZE_CAP : w.size * SIZE
             });
 
-            console.log(countedWords)
-
             return countedWords
         }
 
 
         async function graphWordcloud() {
-            //get chat word counts
-            // const myWords = [ //sample
-            //     { word: "Running", size: 10 },
-            //     { word: "Surfing", size: 20 },
-            //     { word: "Climbing", size: 50 },
-            //     { word: "Kiting", size: 30 },
-            //     { word: "Sailing", size: 20 },
-            //     { word: "Snowboarding", size: 60 }
-            // ];
-
             const myWords = await getWordCount()
 
             // Set the dimensions and margins of the graph
@@ -384,6 +375,132 @@
                     .attr("transform", d => `translate(${d.x},${d.y})rotate(${d.rotate})`)
                     .text(d => d.text);
             }
+        }
+
+
+        function csvToJson2DSpectrumGraph(csvData) {
+            const regexFilter = /(?<=Right:\s+[\S\s]+?)x,y,name[\S\s]+?(?=$)/i
+            const csvFin = regexFilter.test(csvData) ? csvData.match(regexFilter)[0] : ""
+            return csvToJson(csvFin)
+        }
+
+
+        function draw2DSpectrumGraph(csvData, title) {
+            const regexTopLbl = /(?<=Top:\s+)[^\n]+(?=\s+Bottom:)/i
+            const topLabel = regexTopLbl.test(csvData) ? csvData.match(regexTopLbl)[0] : "Top Label"
+            const regexBottomLbl = /(?<=Bottom:\s+)[^\n]+(?=\s+Left:)/i
+            const bottomLabel = regexBottomLbl.test(csvData) ? csvData.match(regexBottomLbl)[0] : "Bottom Label"
+            const regexLeftLbl = /(?<=Left:\s+)[^\n]+(?=\s+Right:)/i
+            const leftLabel = regexLeftLbl.test(csvData) ? csvData.match(regexLeftLbl)[0] : "Left Label"
+            const regexRightLbl = /(?<=Right:\s+)[^\n]+(?=\s+x,y,name)/i
+            const rightLabel = regexRightLbl.test(csvData) ? csvData.match(regexRightLbl)[0] : "Right Label"
+
+            const data = csvToJson2DSpectrumGraph(csvData)
+
+            const margin = { top: 50, right: 30, bottom: 30, left: 30 },
+                width = 450 - margin.left - margin.right,
+                height = 450 - margin.top - margin.bottom;
+
+            const g = d3.select("#graph")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Add a title to the SVG
+            g.append("text")
+                .attr("class", "title")
+                .attr("x", width / 2) // Center the title
+                .attr("y", -30) // Position from the top
+                .text(title);
+
+            const xScale = d3.scaleLinear()
+                .domain([-1, 1])
+                .range([0, width]);
+
+            const yScale = d3.scaleLinear()
+                .domain([-1, 1])
+                .range([height, 0]);
+
+            g.append("g")
+                .attr("class", "x-axis")
+                .attr("transform", `translate(0, ${height / 2})`)
+                .call(d3.axisBottom(xScale).ticks(0));
+
+            g.append("g")
+                .attr("class", "y-axis")
+                .attr("transform", `translate(${width / 2}, 0)`)
+                .call(d3.axisLeft(yScale).ticks(0));
+
+            // Add axis labels for ends
+            g.append("text") // Top label
+                .attr("x", width / 2)
+                .attr("y", -10)
+                .attr("text-anchor", "middle")
+                .style("font-size", "10px")
+                .text(topLabel);
+
+            g.append("text") // Bottom label
+                .attr("x", width / 2)
+                .attr("y", height + 20)
+                .attr("text-anchor", "middle")
+                .style("font-size", "10px")
+                .text(bottomLabel);
+
+            g.append("text") // Left label
+                .attr("x", 0)
+                .attr("y", height / 2)
+                .attr("text-anchor", "middle")
+                .attr("transform", "rotate(-90, -10," + (height / 2) + ")")
+                .style("font-size", "10px")
+                .text(leftLabel);
+
+            g.append("text") // Right label
+                .attr("x", width + 10)
+                .attr("y", height / 2)
+                .attr("text-anchor", "middle")
+                .attr("transform", "rotate(90, " + (width + 10) + "," + (height / 2) + ")")
+                .style("font-size", "10px")
+                .text(rightLabel);
+
+            //tooltip
+            // create a tooltip
+            const tooltip = d3.select("#graph")
+                .append("div")
+                .style("opacity", 0)
+                .attr("class", "tooltip")
+                .style("background-color", "white")
+                .style("border", "solid")
+                .style("border-width", "2px")
+                .style("border-radius", "5px")
+                .style("padding", "5px")
+
+            // Three function that change the tooltip when user hover / move / leave a cell
+            const mouseover = function (event, d) {
+                tooltip.style("opacity", 1)
+            }
+            const mousemove = function (event, d) {
+                tooltip
+                    .html(d.name)
+                    .style("left", (event.x + 70) + "px")
+                    .style("top", event.y + "px")
+            }
+            const mouseleave = function (d) {
+                tooltip.style("opacity", 0)
+            }
+
+            g.selectAll(".dot")
+                .data(data)
+                .enter().append("circle")
+                .attr("class", "dot")
+                .attr("cx", d => xScale(d.x))
+                .attr("cy", d => yScale(d.y))
+                .attr("r", 10)
+                .style("fill", "#69b3a2")
+                .on("mouseover", mouseover)
+                .on("mousemove", mousemove)
+                .on("mouseleave", mouseleave)
         }
 
 
@@ -710,7 +827,7 @@
 
             // Add Y axis
             var y = d3.scaleLinear()
-                .domain([d3.min(data, d => d.y -1 ), d3.max(data, d => d.y + 1)])
+                .domain([d3.min(data, d => d.y - 1), d3.max(data, d => d.y + 1)])
                 .range([height, 0]);
             svg.append("g")
                 .call(d3.axisLeft(y));

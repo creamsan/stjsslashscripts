@@ -198,7 +198,7 @@
                 saveData()
             }
 
-            const regexElementName = /(?<=<result>\s*Name\:\s+)[\s\S]+?(?=\s+Description\:)/i
+            const regexElementName = /(?<=<result>\s*Name\:\s+)[^\n]+?(?=\s+Description\:)/i
             newElement = regexElementName.test(input) ? (input.match(regexElementName))[0] : ""
             if (newElement == "" && expectingOutput) {
                 main_cont.style.display = "none"
