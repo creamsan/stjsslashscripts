@@ -296,7 +296,7 @@
         const MESSAGE_LIMIT = 100
         const WORD_LIMIT = 100
         const SIZE = 2
-        const WORD_SIZE_CAP = 130
+        const WORD_SIZE_CAP = 80
         async function getWordCount() {
             let range = parseInt("{{lastMessageId}}") - MESSAGE_LIMIT
             if (range < 0) {
@@ -326,9 +326,16 @@
             }));
 
             countedWords = countedWords.filter(item => !stopWords.has(item.word));
+            countedWords = countedWords.filter(item => /^\d+$/.test(item.word) === false)
             countedWords = countedWords.sort((a, b) => b.size - a.size).slice(0, WORD_LIMIT);
+            
+            let toSizeMult = 1
+            if(countedWords[0].size <= WORD_SIZE_CAP * 0.8) {
+                toSizeMult = WORD_SIZE_CAP / countedWords[0].size
+            }
+            
             countedWords.forEach(w => {
-                w.size = w.size * SIZE >= WORD_SIZE_CAP ? WORD_SIZE_CAP : w.size * SIZE
+                w.size = w.size * SIZE >= WORD_SIZE_CAP ? WORD_SIZE_CAP : w.size * SIZE * toSizeMult
             });
 
             return countedWords
